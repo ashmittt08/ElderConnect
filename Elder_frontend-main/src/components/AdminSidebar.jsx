@@ -16,7 +16,7 @@ const navItems = [
   { key: "AdminUserManagement", label: "User Management", shortLabel: "Users", icon: "👥" },
   { key: "AdminNGOApprovals", label: "NGO Approvals", shortLabel: "NGOs", icon: "✅" },
   { key: "AdminActivityMonitoring", label: "Activity Monitoring", shortLabel: "Activity", icon: "📈" },
-  { key: "AdminFlaggedReports", label: "Flagged Reports", shortLabel: "Reports", icon: "🚩" },
+  { key: "AdminFlaggedReports", label: "Pending Verifications", shortLabel: "Verifications", icon: "📄" },
 ];
 
 function navigateTo(navigation, key, activeKey) {

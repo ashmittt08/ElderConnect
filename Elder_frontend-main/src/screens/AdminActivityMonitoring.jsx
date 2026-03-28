@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import {
   View, Text, ScrollView, StyleSheet, Platform, ActivityIndicator, RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdminSidebar, { MobileBottomBar } from "../components/AdminSidebar";
 import useResponsive from "../hooks/useResponsive";
@@ -27,7 +28,11 @@ export default function AdminActivityMonitoring({ navigation }) {
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   if (loading) {

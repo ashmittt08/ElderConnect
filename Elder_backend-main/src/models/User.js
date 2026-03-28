@@ -14,11 +14,16 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // NGO Memberships
+    joinedNGO: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // For Elder
+    joinedNGOs: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // For Volunteer
+
     // ✅ ADD THESE
     phone: { type: String },
     address: { type: String },
     gender: { type: String },
     emergencyContact: { type: String },
+    profilePhoto: { type: String, default: "" },
 
     profileCompleted: {
       type: Boolean,

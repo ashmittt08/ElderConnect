@@ -61,7 +61,7 @@ router.get("/status", verifyUser, (req, res) => {
 
 router.put("/update-profile", verifyUser, async (req, res) => {
   try {
-    const { phone, address, gender, emergencyContact, idFrontUrl } = req.body;
+    const { phone, address, gender, emergencyContact, idFrontUrl, profilePhoto } = req.body;
 
     const user = await User.findById(req.user._id);
     
@@ -75,6 +75,10 @@ router.put("/update-profile", verifyUser, async (req, res) => {
     user.phone = phone;
     user.address = address;
     user.gender = gender;
+
+    if (profilePhoto) {
+      user.profilePhoto = profilePhoto;
+    }
 
     if (user.role === "elder") {
       user.emergencyContact = emergencyContact;

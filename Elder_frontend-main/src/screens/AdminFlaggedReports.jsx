@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Modal, Image, Pressable,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdminSidebar, { MobileBottomBar } from "../components/AdminSidebar";
 import useResponsive from "../hooks/useResponsive";
@@ -18,6 +19,7 @@ export default function AdminFlaggedReports({ navigation }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDocs, setSelectedDocs] = useState(null);
 
   const fetchReports = useCallback(async () => {
     try {
@@ -28,7 +30,11 @@ export default function AdminFlaggedReports({ navigation }) {
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { fetchReports(); }, [fetchReports]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchReports();
+    }, [fetchReports])
+  );
   const onRefresh = () => { setRefreshing(true); fetchReports(); };
 
   const handleVerify = async (id, status) => {
@@ -58,7 +64,7 @@ export default function AdminFlaggedReports({ navigation }) {
         <ScrollView style={s.content} contentContainerStyle={[s.cc, { padding: responsive.contentPadding }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
 
-          <Text style={s.heading}>Flagged Reports</Text>
+          <Text style={s.heading}>Pending Verifications</Text>
           <Text style={s.sub}>Review pending identity verifications from platform users</Text>
 
           {/* Stats */}
@@ -75,7 +81,7 @@ export default function AdminFlaggedReports({ navigation }) {
 
           {/* Reports List */}
           <View style={s.sectionH}>
-            <Text style={s.sectionI}>🚩</Text>
+            <Text style={s.sectionI}>📄</Text>
             <Text style={s.sectionT}>Pending Verifications ({reports.length})</Text>
           </View>
 
@@ -137,6 +143,12 @@ export default function AdminFlaggedReports({ navigation }) {
 
                 {/* Actions */}
                 <View style={s.actionsRow}>
+                  <TouchableOpacity 
+                    style={[s.actionBtn, s.viewBtn]} 
+                    onPress={() => setSelectedDocs({ ...report.verification, name: report.name })}
+                  >
+                    <Text style={s.actionBtnText}>View Docs</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={[s.actionBtn, s.verifyBtn]} onPress={() => handleVerify(report._id, "verified")}>
                     <Text style={s.actionBtnText}>✓ Verify User</Text>
                   </TouchableOpacity>
@@ -159,6 +171,49 @@ export default function AdminFlaggedReports({ navigation }) {
 
         <MobileBottomBar navigation={navigation} activeKey="AdminFlaggedReports" />
       </View>
+
+      {/* Document Viewer Modal */}
+      <Modal
+        visible={!!selectedDocs}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedDocs(null)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>{selectedDocs?.name}'s Documents</Text>
+              <TouchableOpacity onPress={() => setSelectedDocs(null)} style={s.modalCloseBtn}>
+                <Text style={s.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={s.modalScroll}>
+              {selectedDocs?.idFrontUrl ? (
+                <View style={s.docImageContainer}>
+                  <Text style={s.docLabel}>ID Front</Text>
+                  <Image source={{ uri: selectedDocs.idFrontUrl }} style={s.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              {selectedDocs?.idBackUrl ? (
+                <View style={s.docImageContainer}>
+                  <Text style={s.docLabel}>ID Back</Text>
+                  <Image source={{ uri: selectedDocs.idBackUrl }} style={s.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              {selectedDocs?.selfieUrl ? (
+                <View style={s.docImageContainer}>
+                  <Text style={s.docLabel}>Selfie</Text>
+                  <Image source={{ uri: selectedDocs.selfieUrl }} style={s.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              
+              {!selectedDocs?.idFrontUrl && !selectedDocs?.idBackUrl && !selectedDocs?.selfieUrl && (
+                <Text style={s.noDocsText}>No documents uploaded by this user.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -220,8 +275,9 @@ const s = StyleSheet.create({
   docBadge: { backgroundColor: `${colors.primary}15`, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: `${colors.primary}30` },
   docBadgeText: { color: colors.primary, fontSize: 12, fontWeight: "600" },
 
-  actionsRow: { flexDirection: "row", gap: 10 },
+  actionsRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", marginTop: 10 },
   actionBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
+  viewBtn: { backgroundColor: colors.warning },
   verifyBtn: { backgroundColor: colors.success },
   rejectBtn: { backgroundColor: `${colors.danger}15`, borderWidth: 1, borderColor: `${colors.danger}40` },
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
@@ -233,4 +289,17 @@ const s = StyleSheet.create({
   emptyIcon: { fontSize: 48 },
   emptyTitle: { color: colors.text, fontSize: 20, fontWeight: "700" },
   emptyText: { color: colors.muted, fontSize: 15 },
+  
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContent: { backgroundColor: colors.card, borderRadius: 16, width: "100%", maxWidth: 600, maxHeight: "85%", overflow: "hidden" },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.sidebar },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.border, justifyContent: "center", alignItems: "center" },
+  modalCloseText: { color: colors.text, fontSize: 16, fontWeight: "bold" },
+  modalScroll: { padding: 20 },
+  docImageContainer: { marginBottom: 24 },
+  docLabel: { color: colors.muted, fontSize: 14, fontWeight: "600", marginBottom: 12 },
+  docImage: { width: "100%", height: 250, backgroundColor: colors.sidebar, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  noDocsText: { color: colors.muted, textAlign: "center", marginVertical: 40 },
 });

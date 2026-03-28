@@ -1,5 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { useContext } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from "react-native";
 import useResponsive from "../hooks/useResponsive";
+import { AuthContext } from "../context/AuthContext";
 
 const colors = {
   sidebar: "#0B1220",
@@ -17,6 +19,8 @@ const navItems = [
   { key: "MyRequests", label: "My Requests", shortLabel: "Requests", icon: "📋" },
   { key: "DeliveryOrderScreen", label: "Deliveries", shortLabel: "Deliver", icon: "🚚" },
   { key: "DeliveryHistoryScreen", label: "Track Orders", shortLabel: "Track", icon: "📍" },
+  { key: "NGOsScreen", label: "Partner NGOs", shortLabel: "NGOs", icon: "🤝" },
+  { key: "EventsScreen", label: "Events", shortLabel: "Events", icon: "📅" },
 ];
 
 function navigateTo(navigation, key, activeKey) {
@@ -32,6 +36,8 @@ function navigateTo(navigation, key, activeKey) {
 /* ── Desktop Sidebar ── */
 export default function ElderSidebar({ navigation, activeKey }) {
   const { showSidebar } = useResponsive();
+  const { user } = useContext(AuthContext);
+
   if (!showSidebar) return null;
 
   return (
@@ -40,6 +46,26 @@ export default function ElderSidebar({ navigation, activeKey }) {
         <Text style={styles.logo}>ElderConnect</Text>
         <Text style={styles.hub}>Elder Hub</Text>
       </View>
+
+      <View style={styles.profileSection}>
+        <View style={styles.avatar}>
+          {user?.profilePhoto ? (
+            <Image 
+              source={{ uri: user.profilePhoto }} 
+              style={{ width: "100%", height: "100%", borderRadius: 25 }} 
+            />
+          ) : (
+            <Text style={styles.avatarText}>
+              {user?.name?.charAt(0)?.toUpperCase()}
+            </Text>
+          )}
+        </View>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName} numberOfLines={1}>{user?.name || "Elder"}</Text>
+          <Text style={styles.profileRole}>Elder</Text>
+        </View>
+      </View>
+
       <View style={styles.sidebarNav}>
         {navItems.map((item) => (
           <TouchableOpacity
@@ -103,6 +129,28 @@ const styles = StyleSheet.create({
   sidebarHeader: { padding: 24, borderBottomWidth: 1, borderBottomColor: colors.border },
   logo: { fontSize: 22, fontWeight: "800", color: colors.primary, letterSpacing: 0.5 },
   hub: { color: colors.muted, marginTop: 4, fontSize: 13 },
+  
+  profileSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: { fontSize: 20, color: colors.text, fontWeight: "bold" },
+  profileInfo: { flex: 1 },
+  profileName: { color: colors.text, fontWeight: "bold", fontSize: 15, marginBottom: 2 },
+  profileRole: { color: colors.muted, fontSize: 12 },
+
   sidebarNav: { padding: 12 },
   sidebarItem: {
     flexDirection: "row", alignItems: "center", padding: 14,

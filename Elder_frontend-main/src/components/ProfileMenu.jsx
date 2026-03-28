@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Modal, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, Modal, Pressable, Image } from "react-native";
 import { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
@@ -35,11 +35,16 @@ export default function ProfileMenu() {
           justifyContent: "center",
           alignItems: "center",
           marginRight: 10,
+          overflow: "hidden",
         }}
       >
-        <Text style={{ color: "white", fontWeight: "bold" }}>
-          {getInitials(user?.name)}
-        </Text>
+        {user?.profilePhoto ? (
+          <Image source={{ uri: user.profilePhoto }} style={{ width: "100%", height: "100%" }} />
+        ) : (
+          <Text style={{ color: "white", fontWeight: "bold" }}>
+            {getInitials(user?.name)}
+          </Text>
+        )}
       </TouchableOpacity>
 
       {/* Dropdown */}

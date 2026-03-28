@@ -8,7 +8,11 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Image,
+  Pressable,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import api from "../api";
@@ -37,6 +41,7 @@ export default function AdminDashboard({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
+  const [selectedDocs, setSelectedDocs] = useState(null);
 
 
   const fetchDashboard = useCallback(async () => {
@@ -51,9 +56,11 @@ export default function AdminDashboard({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboard();
+    }, [fetchDashboard])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -163,7 +170,7 @@ export default function AdminDashboard({ navigation }) {
               color={colors.warning}
             />
             <StatCard
-              title="Reports Pending"
+              title="Pending Verifications"
               value={stats?.reportsPending || 0}
               change={stats?.reportsPending > 0 ? "Needs attention" : "All clear"}
               positive={stats?.reportsPending === 0}
@@ -315,8 +322,8 @@ export default function AdminDashboard({ navigation }) {
             </View>
           </View>
 
-          {/* ── Flagged Reports Section ── */}
-          <SectionHeader title="Flagged Reports" icon="🚩" />
+          {/* ── Pending Verifications Section ── */}
+          <SectionHeader title="Pending Verifications" icon="📄" />
           <View style={styles.sectionCard}>
             {flaggedReports && flaggedReports.length > 0 ? (
               flaggedReports.map((report) => (
@@ -330,6 +337,12 @@ export default function AdminDashboard({ navigation }) {
                     </Text>
                   </View>
                   <View style={styles.reportActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.viewDocsButton]}
+                      onPress={() => setSelectedDocs({ ...report.verification, name: report.name })}
+                    >
+                      <Text style={styles.actionButtonText}>View Docs</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionButton, styles.verifyButton]}
                       onPress={() => handleVerifyUser(report._id, "verified")}
@@ -348,7 +361,7 @@ export default function AdminDashboard({ navigation }) {
             ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>🎉</Text>
-                <Text style={styles.emptyText}>No flagged reports</Text>
+                <Text style={styles.emptyText}>No pending verifications</Text>
               </View>
             )}
           </View>
@@ -359,6 +372,49 @@ export default function AdminDashboard({ navigation }) {
 
         <MobileBottomBar navigation={navigation} activeKey="AdminDashboard" />
       </View>
+
+      {/* Document Viewer Modal */}
+      <Modal
+        visible={!!selectedDocs}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedDocs(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedDocs?.name}'s Documents</Text>
+              <TouchableOpacity onPress={() => setSelectedDocs(null)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {selectedDocs?.idFrontUrl ? (
+                <View style={styles.docImageContainer}>
+                  <Text style={styles.docLabel}>ID Front</Text>
+                  <Image source={{ uri: selectedDocs.idFrontUrl }} style={styles.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              {selectedDocs?.idBackUrl ? (
+                <View style={styles.docImageContainer}>
+                  <Text style={styles.docLabel}>ID Back</Text>
+                  <Image source={{ uri: selectedDocs.idBackUrl }} style={styles.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              {selectedDocs?.selfieUrl ? (
+                <View style={styles.docImageContainer}>
+                  <Text style={styles.docLabel}>Selfie</Text>
+                  <Image source={{ uri: selectedDocs.selfieUrl }} style={styles.docImage} resizeMode="contain" />
+                </View>
+              ) : null}
+              
+              {!selectedDocs?.idFrontUrl && !selectedDocs?.idBackUrl && !selectedDocs?.selfieUrl && (
+                <Text style={styles.noDocsText}>No documents uploaded by this user.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -685,4 +741,53 @@ const styles = StyleSheet.create({
   },
   emptyIcon: { fontSize: 36 },
   emptyText: { color: colors.muted, fontSize: 15 },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 600,
+    maxHeight: "85%",
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.sidebar,
+  },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCloseText: { color: colors.text, fontSize: 16, fontWeight: "bold" },
+  modalScroll: { padding: 20 },
+  docImageContainer: { marginBottom: 24 },
+  docLabel: { color: colors.muted, fontSize: 14, fontWeight: "600", marginBottom: 12 },
+  docImage: {
+    width: "100%",
+    height: 250,
+    backgroundColor: colors.sidebar,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noDocsText: { color: colors.muted, textAlign: "center", marginVertical: 40 },
+  viewDocsButton: { backgroundColor: colors.warning },
 });

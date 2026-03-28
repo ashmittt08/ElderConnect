@@ -2,6 +2,7 @@ import express from "express";
 import verifyUser from "../middleware/verifyUser.js";
 import requireRole from "../middleware/requireRole.js";
 import Request from "../models/Request.js";
+import User from "../models/User.js";
 import OpenAI from "openai";
 
 const router = express.Router();
@@ -66,6 +67,55 @@ router.get(
   }
 );
 
+// GET NEAREST NGOs (Text-based address matching)
+router.get(
+  "/nearest-ngos",
+  verifyUser,
+  requireRole("elder"),
+  async (req, res) => {
+    try {
+      const elderId = req.user._id;
+      const elder = await User.findById(elderId);
+
+      if (!elder) return res.status(404).json({ message: "Elder not found" });
+
+      // Get all approved NGOs
+      const ngos = await User.find({ role: "ngo", approved: true }).select(
+        "name address phone profilePhoto email"
+      );
+
+      const elderAddress = (elder.address || "").toLowerCase();
+      
+      // Simple pseudo-matching: prioritize NGOs with overlapping address words
+      const elderWords = elderAddress.split(/\s+/).filter(w => w.length > 3);
+
+      const scoredNgos = ngos.map((ngo) => {
+        let score = 0;
+        const ngoAddress = (ngo.address || "").toLowerCase();
+        
+        elderWords.forEach(word => {
+          if (ngoAddress.includes(word)) score += 1;
+        });
+
+        // Add small random noise to shuffle ties
+        score += Math.random() * 0.1;
+        
+        return { ngo, score };
+      });
+
+      // Sort by score descending and take top 3
+      scoredNgos.sort((a, b) => b.score - a.score);
+      
+      const topNgos = scoredNgos.slice(0, 3).map(n => n.ngo);
+
+      res.status(200).json(topNgos);
+    } catch (err) {
+      console.error("❌ FETCH NEAREST NGOS ERROR:", err);
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
 // AI COMPANION CHAT
 router.post(
   "/chat",
@@ -109,6 +159,49 @@ router.post(
       
       // Send a fallback message if API fails
       res.status(200).json({ reply: "I'm having a bit of trouble connecting right now, but I'm here for you! Please try again in a moment." });
+    }
+  }
+);
+
+// GET ALL NGOs
+router.get(
+  "/ngos",
+  verifyUser,
+  requireRole("elder"),
+  async (req, res) => {
+    try {
+      const ngos = await User.find({ role: "ngo", approved: true }).select(
+        "name address phone profilePhoto email"
+      );
+      res.status(200).json(ngos);
+    } catch (err) {
+      console.error("❌ FETCH NGOS ERROR:", err);
+      res.status(500).json({ message: "Failed to fetch NGOs" });
+    }
+  }
+);
+
+// JOIN NGO (Elder joins a single NGO)
+router.post(
+  "/join-ngo/:ngoId",
+  verifyUser,
+  requireRole("elder"),
+  async (req, res) => {
+    try {
+      const ngoId = req.params.ngoId;
+      const elderId = req.user._id;
+
+      const ngo = await User.findById(ngoId);
+      if (!ngo || ngo.role !== "ngo") {
+        return res.status(404).json({ message: "NGO not found" });
+      }
+
+      await User.findByIdAndUpdate(elderId, { joinedNGO: ngoId });
+
+      res.status(200).json({ message: "Successfully joined NGO" });
+    } catch (err) {
+      console.error("❌ JOIN NGO ERROR:", err);
+      res.status(500).json({ message: "Failed to join NGO" });
     }
   }
 );

@@ -36,6 +36,8 @@ import DeliveryOrderScreen from "../screens/DeliveryOrderScreen";
 import DeliveryTrackingScreen from "../screens/DeliveryTrackingScreen";
 import DeliveryHistoryScreen from "../screens/DeliveryHistoryScreen";
 import VolunteerActiveDelivery from "../screens/VolunteerActiveDelivery";
+import NGOsScreen from "../screens/NGOsScreen";
+import EventsScreen from "../screens/EventsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -88,6 +90,8 @@ export default function AppNavigator() {
             <Stack.Screen name="DeliveryTrackingScreen" component={DeliveryTrackingScreen} options={{ title: "Track Delivery" }} />
             <Stack.Screen name="DeliveryHistoryScreen" component={DeliveryHistoryScreen} options={{ title: "My Deliveries" }} />
             <Stack.Screen name="CompanionScreen" component={CompanionScreen} options={{ title: "AI Companion" }} />
+            <Stack.Screen name="NGOsScreen" component={NGOsScreen} options={{ title: "Partner NGOs" }} />
+            <Stack.Screen name="EventsScreen" component={EventsScreen} options={{ title: "Community Events" }} />
           </>
         ) : user.role === "volunteer" ? (
           <>
@@ -101,6 +105,8 @@ export default function AppNavigator() {
             />
             <Stack.Screen name="MyTasks" component={MyTasks} />
             <Stack.Screen name="VolunteerActiveDelivery" component={VolunteerActiveDelivery} options={{ title: "Active Delivery" }} />
+            <Stack.Screen name="NGOsScreen" component={NGOsScreen} options={{ title: "Partner NGOs" }} />
+            <Stack.Screen name="EventsScreen" component={EventsScreen} options={{ title: "Community Events" }} />
           </>
         ) : user.role === "ngo" ? (
           <>
@@ -113,6 +119,7 @@ export default function AppNavigator() {
               component={NGOVolunteers}
               options={{ title: "Volunteers" }}
             />
+            <Stack.Screen name="EventsScreen" component={EventsScreen} options={{ title: "Community Events" }} />
           </>
         ) : (
           <>
@@ -121,7 +128,7 @@ export default function AppNavigator() {
             <Stack.Screen name="AdminUserManagement" component={AdminUserManagement} options={{ title: "User Management" }} />
             <Stack.Screen name="AdminNGOApprovals" component={AdminNGOApprovals} options={{ title: "NGO Approvals" }} />
             <Stack.Screen name="AdminActivityMonitoring" component={AdminActivityMonitoring} options={{ title: "Activity Monitoring" }} />
-            <Stack.Screen name="AdminFlaggedReports" component={AdminFlaggedReports} options={{ title: "Flagged Reports" }} />
+            <Stack.Screen name="AdminFlaggedReports" component={AdminFlaggedReports} options={{ title: "Pending Verifications" }} />
           </>
         )}
         <Stack.Screen name="MyProfile" component={MyProfile} />

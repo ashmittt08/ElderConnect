@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useContext, useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,6 +38,8 @@ export default function MyProfile() {
   const [emergencyContact, setEmergencyContact] = useState("");
   const [idImage, setIdImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const navigation = useNavigation();
 
@@ -55,6 +58,7 @@ export default function MyProfile() {
       setAddress(user.address || "");
       setGender(user.gender || "");
       setEmergencyContact(user.emergencyContact || "");
+      setProfilePhoto(user.profilePhoto || null);
     }
   }, [user]);
 
@@ -86,11 +90,17 @@ export default function MyProfile() {
 
     const data = new FormData();
 
-    data.append("file", {
-      uri: idImage,
-      type: "image/jpeg",
-      name: "id.jpg",
-    });
+    if (Platform.OS === "web") {
+      const res = await fetch(idImage);
+      const blob = await res.blob();
+      data.append("file", blob);
+    } else {
+      data.append("file", {
+        uri: idImage,
+        type: "image/jpeg",
+        name: "id.jpg",
+      });
+    }
 
     data.append("upload_preset", "elder_verify");
     data.append("cloud_name", "rishisharma");
@@ -104,13 +114,69 @@ export default function MyProfile() {
     return json.secure_url;
   };
 
+  const pickProfilePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      alert("Permission required!");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+      aspect: [1, 1], // Square aspect ratio for profile photo
+    });
+
+    if (!result.canceled) {
+      setProfilePhoto(result.assets[0].uri);
+    }
+  };
+
+  const uploadProfileImage = async () => {
+    if (!profilePhoto || profilePhoto.startsWith("http")) return profilePhoto; // Already uploaded
+
+    const data = new FormData();
+    
+    if (Platform.OS === "web") {
+      const res = await fetch(profilePhoto);
+      const blob = await res.blob();
+      data.append("file", blob);
+    } else {
+      data.append("file", {
+        uri: profilePhoto,
+        type: "image/jpeg",
+        name: "profile.jpg",
+      });
+    }
+
+    data.append("upload_preset", "elder_verify");
+    data.append("cloud_name", "rishisharma");
+
+    const res = await fetch("https://api.cloudinary.com/v1_1/rishisharma/image/upload", {
+      method: "POST",
+      body: data,
+    });
+    const json = await res.json();
+    return json.secure_url;
+  };
+
   const saveProfile = async () => {
     try {
       setUploading(true);
       const token = await auth.currentUser.getIdToken(true);
 
-      let imageUrl = null;
+      let imageUrl = user.verification?.idFrontUrl || null;
+      let finalProfilePhoto = user.profilePhoto;
+
       if (idImage) imageUrl = await uploadImage();
+      
+      // Upload profile photo if changed and not a url
+      if (profilePhoto && !profilePhoto.startsWith("http")) {
+        finalProfilePhoto = await uploadProfileImage();
+      } else if (profilePhoto) {
+         finalProfilePhoto = profilePhoto;
+      }
 
       const res = await axios.put(
         "http://localhost:5000/auth/update-profile",
@@ -120,6 +186,7 @@ export default function MyProfile() {
           gender,
           emergencyContact,
           idFrontUrl: imageUrl,
+          profilePhoto: finalProfilePhoto,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -127,6 +194,7 @@ export default function MyProfile() {
       );
 
       login(res.data);
+      setIsEditing(false);
       alert("Profile updated successfully");
     } catch (err) {
       alert("Failed to update profile");
@@ -148,6 +216,30 @@ export default function MyProfile() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.header}>My Profile</Text>
 
+        {/* Profile Avatar Selection */}
+        <View style={styles.avatarSection}>
+          <TouchableOpacity 
+            onPress={isEditing ? pickProfilePhoto : null} 
+            style={styles.avatarContainer}
+            disabled={!isEditing}
+          >
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarPlaceholderText}>
+                  {user?.name?.charAt(0)?.toUpperCase()}
+                </Text>
+              </View>
+            )}
+            {isEditing && (
+              <View style={styles.editAvatarBadge}>
+                <Text style={styles.editAvatarIcon}>✏️</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Basic Info */}
         <View style={styles.card}>
           <Text style={styles.label}>Name</Text>
@@ -164,38 +256,66 @@ export default function MyProfile() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Personal Details</Text>
 
-          <TextInput
-            placeholder="Phone"
-            value={phone}
-            onChangeText={setPhone}
-            style={styles.input}
-            placeholderTextColor={colors.muted}
-          />
-
-          <TextInput
-            placeholder="Address"
-            value={address}
-            onChangeText={setAddress}
-            style={styles.input}
-            placeholderTextColor={colors.muted}
-          />
-
-          <TextInput
-            placeholder="Gender"
-            value={gender}
-            onChangeText={setGender}
-            style={styles.input}
-            placeholderTextColor={colors.muted}
-          />
-
-          {user?.role === "elder" && (
+          {isEditing ? (
             <TextInput
-              placeholder="Emergency Contact"
-              value={emergencyContact}
-              onChangeText={setEmergencyContact}
+              placeholder="Phone"
+              value={phone}
+              onChangeText={setPhone}
               style={styles.input}
               placeholderTextColor={colors.muted}
             />
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Phone</Text>
+              <Text style={styles.value}>{phone || "Not set"}</Text>
+            </View>
+          )}
+
+          {isEditing ? (
+            <TextInput
+              placeholder="Address"
+              value={address}
+              onChangeText={setAddress}
+              style={styles.input}
+              placeholderTextColor={colors.muted}
+            />
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Address</Text>
+              <Text style={styles.value}>{address || "Not set"}</Text>
+            </View>
+          )}
+
+          {isEditing ? (
+            <TextInput
+              placeholder="Gender"
+              value={gender}
+              onChangeText={setGender}
+              style={styles.input}
+              placeholderTextColor={colors.muted}
+            />
+          ) : (
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Gender</Text>
+              <Text style={styles.value}>{gender || "Not set"}</Text>
+            </View>
+          )}
+
+          {user?.role === "elder" && (
+            isEditing ? (
+              <TextInput
+                placeholder="Emergency Contact"
+                value={emergencyContact}
+                onChangeText={setEmergencyContact}
+                style={styles.input}
+                placeholderTextColor={colors.muted}
+              />
+            ) : (
+              <View style={styles.detailRow}>
+                <Text style={styles.label}>Emergency Contact</Text>
+                <Text style={styles.value}>{emergencyContact || "Not set"}</Text>
+              </View>
+            )
           )}
         </View>
 
@@ -203,30 +323,60 @@ export default function MyProfile() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Government ID</Text>
 
-          <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-            <Text style={styles.uploadText}>Upload ID</Text>
-          </TouchableOpacity>
+          {isEditing && (
+            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+              <Text style={styles.uploadText}>{idImage || user?.verification?.idFrontUrl ? "Change ID" : "Upload ID"}</Text>
+            </TouchableOpacity>
+          )}
 
-          {idImage && (
-            <Image
-              source={{ uri: idImage }}
-              style={styles.imagePreview}
-            />
+          {idImage ? (
+            <Image source={{ uri: idImage }} style={styles.imagePreview} />
+          ) : user?.verification?.idFrontUrl ? (
+            <Image source={{ uri: user.verification.idFrontUrl }} style={styles.imagePreview} />
+          ) : (
+            !isEditing && <Text style={styles.value}>No ID uploaded</Text>
           )}
         </View>
 
-        {/* Save Button */}
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={saveProfile}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.saveText}>Save Profile</Text>
-          )}
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        {isEditing ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.saveButton, styles.cancelButton]}
+              onPress={() => {
+                setIsEditing(false);
+                setPhone(user.phone || "");
+                setAddress(user.address || "");
+                setGender(user.gender || "");
+                setEmergencyContact(user.emergencyContact || "");
+                setProfilePhoto(user.profilePhoto || null);
+                setIdImage(null);
+              }}
+              disabled={uploading}
+            >
+              <Text style={styles.saveText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveButton, styles.submitButton]}
+              onPress={saveProfile}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.saveText}>Save Profile</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.editProfileBtn}
+            onPress={() => setIsEditing(true)}
+          >
+            <Text style={styles.saveText}>Edit Profile</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Verification Status */}
         <View style={styles.card}>
@@ -280,6 +430,62 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: colors.primary,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.border,
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 50,
+  },
+
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.border,
+  },
+
+  avatarPlaceholderText: {
+    fontSize: 40,
+    color: colors.text,
+    fontWeight: "bold",
+  },
+
+  editAvatarBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: -5,
+    backgroundColor: colors.card,
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+
+  editAvatarIcon: {
+    fontSize: 14,
+  },
+
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
@@ -329,7 +535,29 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.border,
+  },
+
+  submitButton: {
+    flex: 2,
     backgroundColor: colors.success,
+  },
+
+  editProfileBtn: {
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -340,6 +568,10 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "600",
     fontSize: 16,
+  },
+  
+  detailRow: {
+    marginBottom: 10,
   },
 
   statusBadge: {

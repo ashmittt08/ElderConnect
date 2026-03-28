@@ -11,6 +11,7 @@ import ngoRoutes from "./src/routes/ngoRoutes.js";
 import adminRoutes from "./src/routes/adminRoutes.js";
 import profileRoutes from "./src/routes/profileRoutes.js";
 import deliveryRoutes from "./src/routes/deliveryRoutes.js";
+import eventRoutes from "./src/routes/eventRoutes.js";
 
 
 connectDB();
@@ -64,6 +65,7 @@ app.use("/ngo", ngoRoutes);
 app.use("/admin", adminRoutes);
 app.use("/profile", profileRoutes);
 app.use("/delivery", deliveryRoutes);
+app.use("/events", eventRoutes);
 
 console.log("ENV:", process.env.FIREBASE_SERVICE_ACCOUNT ? "FOUND" : "MISSING");
 

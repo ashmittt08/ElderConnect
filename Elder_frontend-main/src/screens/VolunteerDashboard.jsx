@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
@@ -28,7 +29,7 @@ const colors = {
 };
 
 export default function VolunteerDashboard({ navigation }) {
-  const user = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
 
   const [available, setAvailable] = useState([]);
   const [completed, setCompleted] = useState([]);
@@ -113,9 +114,16 @@ export default function VolunteerDashboard({ navigation }) {
           <View style={styles.sidebar}>
             <View style={styles.profileSection}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {user?.name?.charAt(0)?.toUpperCase()}
-                </Text>
+                {user?.profilePhoto ? (
+                  <Image 
+                    source={{ uri: user.profilePhoto }} 
+                    style={{ width: "100%", height: "100%", borderRadius: 30 }} 
+                  />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {user?.name?.charAt(0)?.toUpperCase()}
+                  </Text>
+                )}
               </View>
 
               <Text style={styles.profileName}>
@@ -135,6 +143,14 @@ export default function VolunteerDashboard({ navigation }) {
             <SidebarItem
               label="My Tasks"
               onPress={() => navigation.navigate("MyTasks")}
+            />
+            <SidebarItem
+              label="Partner NGOs"
+              onPress={() => navigation.navigate("NGOsScreen")}
+            />
+            <SidebarItem
+              label="Events"
+              onPress={() => navigation.navigate("EventsScreen")}
             />
             {activeDelivery && (
               <SidebarItem

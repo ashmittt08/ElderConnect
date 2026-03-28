@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import api from "../api";
@@ -32,13 +34,18 @@ export default function ElderDashboard({ navigation }) {
   const responsive = useResponsive();
 
   const [requests, setRequests] = useState([]);
+  const [nearestNGOs, setNearestNGOs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await api.get("/elder/requests");
-      setRequests(res.data);
+      const [reqsRes, ngosRes] = await Promise.all([
+        api.get("/elder/requests"),
+        api.get("/elder/nearest-ngos"),
+      ]);
+      setRequests(reqsRes.data);
+      setNearestNGOs(ngosRes.data);
     } catch (err) {
       console.error("ELDER DASHBOARD ERROR:", err.response?.data || err);
     } finally {
@@ -47,9 +54,11 @@ export default function ElderDashboard({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchRequests();
+    }, [fetchRequests])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -166,6 +175,34 @@ export default function ElderDashboard({ navigation }) {
               <Text style={styles.actionTitle}>My Requests</Text>
               <Text style={styles.actionDesc}>View all your requests</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Nearest Old Age Homes */}
+          <SectionHeader title="Nearest Support & Old Age Homes" icon="🏥" />
+          <View style={styles.ngoList}>
+            {nearestNGOs.length > 0 ? (
+              nearestNGOs.map((ngo) => (
+                <View key={ngo._id} style={styles.ngoCard}>
+                  <View style={styles.ngoAvatar}>
+                    {ngo.profilePhoto ? (
+                      <Image source={{ uri: ngo.profilePhoto }} style={styles.ngoImage} />
+                    ) : (
+                      <Text style={styles.ngoAvatarText}>{ngo.name?.charAt(0)?.toUpperCase()}</Text>
+                    )}
+                  </View>
+                  <View style={styles.ngoInfo}>
+                    <Text style={styles.ngoName}>{ngo.name}</Text>
+                    <Text style={styles.ngoAddress}>📍 {ngo.address || "Address not provided"}</Text>
+                    {ngo.phone && <Text style={styles.ngoPhone}>📞 {ngo.phone}</Text>}
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Text style={styles.emptyIcon}>🏢</Text>
+                <Text style={styles.emptyText}>No nearby homes found yet.</Text>
+              </View>
+            )}
           </View>
 
           {/* Recent Activity */}
@@ -408,4 +445,33 @@ const styles = StyleSheet.create({
   },
   emptyIcon: { fontSize: 36 },
   emptyText: { color: colors.muted, fontSize: 15 },
+  emptyStateContainer: { alignItems: "center", paddingVertical: 20 },
+
+  // NGO Card Styles
+  ngoList: { gap: 14, marginBottom: 32 },
+  ngoCard: {
+    flexDirection: "row",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    alignItems: "center",
+  },
+  ngoAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${colors.primary}25`,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+    overflow: "hidden",
+  },
+  ngoImage: { width: "100%", height: "100%" },
+  ngoAvatarText: { color: colors.primary, fontSize: 24, fontWeight: "bold" },
+  ngoInfo: { flex: 1, gap: 4 },
+  ngoName: { color: colors.text, fontSize: 16, fontWeight: "700" },
+  ngoAddress: { color: colors.muted, fontSize: 13 },
+  ngoPhone: { color: colors.success, fontSize: 13, fontWeight: "600", marginTop: 2 },
 });

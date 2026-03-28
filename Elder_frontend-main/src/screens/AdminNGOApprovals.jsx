@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdminSidebar, { MobileBottomBar } from "../components/AdminSidebar";
 import useResponsive from "../hooks/useResponsive";
@@ -47,9 +48,11 @@ export default function AdminNGOApprovals({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchNGOs();
-  }, [fetchNGOs]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchNGOs();
+    }, [fetchNGOs])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

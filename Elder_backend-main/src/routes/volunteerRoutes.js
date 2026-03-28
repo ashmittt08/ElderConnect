@@ -107,5 +107,54 @@ router.get(
   }
 );
 
+// GET ALL NGOs
+router.get(
+  "/ngos",
+  verifyUser,
+  requireRole("volunteer"),
+  async (req, res) => {
+    try {
+      const ngos = await User.find({ role: "ngo", approved: true }).select(
+        "name address phone profilePhoto email"
+      );
+      res.status(200).json(ngos);
+    } catch (err) {
+      console.error("❌ FETCH NGOS ERROR:", err);
+      res.status(500).json({ message: "Failed to fetch NGOs" });
+    }
+  }
+);
+
+// JOIN NGO (Volunteer joins multiple NGOs)
+router.post(
+  "/join-ngo/:ngoId",
+  verifyUser,
+  requireRole("volunteer"),
+  async (req, res) => {
+    try {
+      const ngoId = req.params.ngoId;
+      const volunteerId = req.user._id;
+
+      const ngo = await User.findById(ngoId);
+      if (!ngo || ngo.role !== "ngo") {
+        return res.status(404).json({ message: "NGO not found" });
+      }
+
+      // Check if already joined
+      const volunteer = await User.findById(volunteerId);
+      if (volunteer.joinedNGOs && volunteer.joinedNGOs.includes(ngoId)) {
+        return res.status(400).json({ message: "Already joined this NGO" });
+      }
+
+      volunteer.joinedNGOs.push(ngoId);
+      await volunteer.save();
+
+      res.status(200).json({ message: "Successfully joined NGO" });
+    } catch (err) {
+      console.error("❌ JOIN NGO ERROR:", err);
+      res.status(500).json({ message: "Failed to join NGO" });
+    }
+  }
+);
 
 export default router;

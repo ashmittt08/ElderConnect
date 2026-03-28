@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
@@ -25,7 +27,7 @@ const colors = {
 };
 
 export default function NGODashboard({ navigation }) {
-  const user = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
 
   const [volunteerCount, setVolunteerCount] = useState(0);
   const [openRequests, setOpenRequests] = useState(0);
@@ -34,38 +36,40 @@ export default function NGODashboard({ navigation }) {
   const [loading, setLoading] = useState(true);
   const responsive = useResponsive();
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const token = await auth.currentUser.getIdToken();
+  useFocusEffect(
+    useCallback(() => {
+      const fetchDashboard = async () => {
+        try {
+          const token = await auth.currentUser.getIdToken();
 
-        const statsRes = await axios.get(
-          "http://localhost:5000/ngo/stats",
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+          const statsRes = await axios.get(
+            "http://localhost:5000/ngo/stats",
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
 
-        setVolunteerCount(statsRes.data.volunteers);
-        setOpenRequests(statsRes.data.openRequests);
-        setCompletedCount(statsRes.data.completedTasks);
+          setVolunteerCount(statsRes.data.volunteers);
+          setOpenRequests(statsRes.data.openRequests);
+          setCompletedCount(statsRes.data.completedTasks);
 
 
-        const completedRes = await axios.get(
-          "http://localhost:5000/ngo/completed",
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
+          const completedRes = await axios.get(
+            "http://localhost:5000/ngo/completed",
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
 
-        setVolunteerCount(statsRes.data.volunteers);
-        setCompletedCount(statsRes.data.completedTasks);
-        setRecent(completedRes.data);
-      } catch (err) {
-        console.log("NGO DASHBOARD ERROR:", err.response?.data || err);
-      } finally {
-        setLoading(false);
-      }
-    };
+          setVolunteerCount(statsRes.data.volunteers);
+          setCompletedCount(statsRes.data.completedTasks);
+          setRecent(completedRes.data);
+        } catch (err) {
+          console.log("NGO DASHBOARD ERROR:", err.response?.data || err);
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    fetchDashboard();
-  }, []);
+      fetchDashboard();
+    }, [])
+  );
 
   if (loading)
     return (
@@ -79,8 +83,29 @@ export default function NGODashboard({ navigation }) {
       <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
         {responsive.showSidebar && (
           <View style={styles.sidebar}>
-            <Text style={styles.logo}>ElderConnect</Text>
-            <Text style={styles.hub}>NGO Hub</Text>
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.logo}>ElderConnect</Text>
+              <Text style={styles.hub}>NGO Hub</Text>
+            </View>
+
+            <View style={styles.profileSection}>
+              <View style={styles.avatar}>
+                {user?.profilePhoto ? (
+                  <Image 
+                    source={{ uri: user.profilePhoto }} 
+                    style={{ width: "100%", height: "100%", borderRadius: 25 }} 
+                  />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {user?.name?.charAt(0)?.toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName} numberOfLines={1}>{user?.name || "NGO"}</Text>
+                <Text style={styles.profileRole}>NGO</Text>
+              </View>
+            </View>
 
             <SidebarItem label="Dashboard" active />
             <SidebarItem
@@ -90,6 +115,10 @@ export default function NGODashboard({ navigation }) {
             <SidebarItem
               label="Available Requests"
               onPress={() => navigation.navigate("NGORequests")}
+            />
+            <SidebarItem
+              label="Events"
+              onPress={() => navigation.navigate("EventsScreen")}
             />
           </View>
         )}
@@ -189,8 +218,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.sidebar,
     padding: 20,
   },
+  sidebarHeader: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 20,
+  },
   logo: { fontSize: 20, fontWeight: "bold", color: colors.text },
-  hub: { color: colors.muted, marginBottom: 30 },
+  hub: { color: colors.muted },
+
+  profileSection: {
+    paddingBottom: 20,
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: { fontSize: 20, color: colors.text, fontWeight: "bold" },
+  profileInfo: { flex: 1 },
+  profileName: { color: colors.text, fontWeight: "bold", fontSize: 15, marginBottom: 2 },
+  profileRole: { color: colors.muted, fontSize: 12 },
+
   sidebarItem: { padding: 12, borderRadius: 10, marginBottom: 8 },
   sidebarText: { color: colors.text },
   content: { flex: 1, padding: 24 },
