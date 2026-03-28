@@ -34,12 +34,29 @@ export default function MyTasks() {
       setLoading(true);
       const token = await auth.currentUser.getIdToken();
 
-      const res = await axios.get(
-        "http://localhost:5000/volunteer/tasks",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const [tasksRes, historyRes] = await Promise.all([
+        axios.get("http://localhost:5000/volunteer/tasks", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get("http://localhost:5000/delivery/history", {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
 
-      setTasks(res.data);
+      const regularTasks = tasksRes.data.map(t => ({ ...t, displayType: t.type }));
+      const deliveryTasks = historyRes.data.map(d => ({
+        _id: d._id,
+        displayType: d.category === "medicine" ? "Medicine Delivery" : "Grocery Delivery",
+        description: `Deliver to ${d.deliveryAddress}`,
+        elder: d.elder,
+        status: d.status,
+        updatedAt: d.updatedAt,
+      }));
+
+      const mergedTasks = [...regularTasks, ...deliveryTasks]
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+      setTasks(mergedTasks);
     } catch (err) {
       console.error("FETCH TASKS ERROR:", err.response?.data || err);
     } finally {
@@ -105,7 +122,7 @@ export default function MyTasks() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Text style={styles.type}>
-              {item.type?.toUpperCase()}
+              {item.displayType?.toUpperCase() || item.type?.toUpperCase()}
             </Text>
 
             <Text style={styles.description}>
@@ -122,7 +139,7 @@ export default function MyTasks() {
 
             <StatusBadge status={item.status} />
 
-            {item.status !== "completed" && (
+            {!["completed", "delivered", "cancelled"].includes(item.status?.toLowerCase()) && (
               <TouchableOpacity
                 style={styles.completeButton}
                 onPress={() => completeTask(item._id)}
@@ -149,14 +166,14 @@ const StatusBadge = ({ status }) => {
 
   let backgroundColor = colors.card;
 
-  if (lower === "completed") backgroundColor = colors.success;
-  else if (lower === "assigned") backgroundColor = colors.primary;
+  if (lower === "completed" || lower === "delivered") backgroundColor = colors.success;
+  else if (lower === "assigned" || lower === "accepted" || lower === "picked_up" || lower === "out_for_delivery") backgroundColor = colors.primary;
   else backgroundColor = colors.warning;
 
   return (
     <View style={[styles.statusBadge, { backgroundColor }]}>
       <Text style={styles.statusText}>
-        {status?.toUpperCase()}
+        {status?.replace(/_/g, " ").toUpperCase()}
       </Text>
     </View>
   );

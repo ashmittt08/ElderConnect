@@ -9,6 +9,7 @@ import {
   Platform,
   Linking,
   Animated,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../api";
@@ -26,27 +27,26 @@ import {
 
 import { MapView, Marker } from "../components/MapModule";
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 const colors = {
-  bg: "#0F172A",
+  bg: "#0F172A", // Dark theme background
   card: "#1E293B",
+  cardOverlay: "rgba(30, 41, 59, 0.95)", // Slightly transparent for overlap
   border: "#334155",
-  primary: "#4799EB",
-  primaryDark: "#2563EB",
-  success: "#22C55E",
-  warning: "#F59E0B",
-  danger: "#EF4444",
+  primary: "#60B246", // Swiggy Green
+  primaryDark: "#4a8f35",
+  accent: "#FC8019", // Swiggy Orange
   text: "#F1F5F9",
   muted: "#94A3B8",
-  medicine: "#8B5CF6",
-  grocery: "#10B981",
+  pulse: "rgba(96, 178, 70, 0.4)",
 };
 
 const STATUS_STEPS = [
-  { key: "pending", label: "Ordered", icon: "📦" },
-  { key: "accepted", label: "Accepted", icon: "✅" },
-  { key: "picked_up", label: "Picked Up", icon: "🏪" },
-  { key: "out_for_delivery", label: "Out for Delivery", icon: "🚚" },
-  { key: "delivered", label: "Delivered", icon: "✔️" },
+  { key: "accepted", label: "Accepted", icon: "✓" },
+  { key: "picked_up", label: "Picked Up", icon: "✓" },
+  { key: "out_for_delivery", label: "On the way", icon: "🛵" },
+  { key: "delivered", label: "Delivered", icon: "🏁" },
 ];
 
 export default function DeliveryTrackingScreen({ route, navigation }) {
@@ -58,19 +58,28 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   const [volunteerLocation, setVolunteerLocation] = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pulse animation for live indicator
+  // Mock destination coordinate for VIT Bhopal area to show the route line
+  const mockDestination = { latitude: 23.0760, longitude: 76.8520 };
+
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.3, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: false }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
       ])
     );
     pulse.start();
-    return () => pulse.stop();
+    return () => {
+      try {
+        if (pulse && typeof pulse.stop === 'function') {
+          pulse.stop();
+        }
+      } catch (e) {
+        console.warn("Pulse animation stop error:", e);
+      }
+    };
   }, [pulseAnim]);
 
-  // Fetch order details
   useEffect(() => {
     const fetchOrder = async () => {
       try {
@@ -89,7 +98,6 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
     if (orderId) fetchOrder();
   }, [orderId]);
 
-  // Socket.IO real-time tracking
   useEffect(() => {
     if (!orderId) return;
     const socket = connectSocket();
@@ -115,9 +123,9 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading delivery...</Text>
+          <Text style={styles.loadingText}>Fetching your order details...</Text>
         </View>
       </SafeAreaView>
     );
@@ -126,7 +134,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   if (!order) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <View style={styles.centered}>
           <Text style={{ fontSize: 48 }}>📭</Text>
           <Text style={styles.loadingText}>Delivery not found</Text>
         </View>
@@ -134,255 +142,207 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
     );
   }
 
-  const currentStepIndex = STATUS_STEPS.findIndex((s) => s.key === order.status);
+  // Treat 'pending' as 0th step (before accepted)
+  const currentStepIndex =
+    order.status === "pending"
+      ? -1
+      : STATUS_STEPS.findIndex((s) => s.key === order.status);
   const isActive = !["delivered", "cancelled"].includes(order.status);
 
-  const getStatusTime = (statusKey) => {
-    const entry = order.statusHistory?.find((h) => h.status === statusKey);
-    if (entry) {
-      return new Date(entry.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    return currentStepIndex >= STATUS_STEPS.findIndex((s) => s.key === statusKey)
-      ? ""
-      : "Pending";
+  // Time formatting
+  const getETA = () => {
+    if (order.status === "delivered") return "Delivered";
+    if (!order.estimatedArrival) return "Calculating ETA...";
+    
+    const etaMs = new Date(order.estimatedArrival).getTime();
+    const nowMs = new Date().getTime();
+    const diffMins = Math.max(1, Math.round((etaMs - nowMs) / 60000));
+    
+    return `Arriving in ${diffMins} min`;
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View
-        style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}
-      >
+      <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
         <ElderSidebar navigation={navigation} activeKey="DeliveryOrderScreen" />
 
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={[styles.contentInner, { padding: responsive.contentPadding }]}
-        >
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.statusBadge}>
-                {isActive ? "🟢 IN PROGRESS" : order.status === "delivered" ? "✅ DELIVERED" : "❌ CANCELLED"}
-              </Text>
-              <Text style={styles.heading}>Delivery Status</Text>
-            </View>
-            {order.estimatedArrival && isActive && (
-              <View style={styles.etaCard}>
-                <Text style={styles.etaLabel}>Estimated Arrival</Text>
-                <Text style={styles.etaTime}>
-                  {new Date(order.estimatedArrival).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
+        <View style={styles.mainContent}>
+          {/* Map Section - Takes upper half */}
+          <View style={styles.mapSection}>
+            {isActive || order.status === "delivered" ? (
+              <MapView
+                style={styles.map}
+                volunteer={volunteerLocation}
+                destination={mockDestination}
+              />
+            ) : (
+              <View style={styles.mapPlaceholder}>
+                <Text style={styles.mapPlaceholderText}>Map unavailable</Text>
+              </View>
+            )}
+
+            {/* Live Indicator Overlay */}
+            {isActive && (
+              <View style={styles.liveBadgeOverlay}>
+                <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
+                <Text style={styles.liveTextLabel}>TRACKING LIVE</Text>
               </View>
             )}
           </View>
 
-          <View
-            style={[
-              styles.mainGrid,
-              { flexDirection: responsive.isMobile ? "column" : "row" },
-            ]}
+          {/* Bottom Sheet Style Overlay */}
+          <ScrollView 
+            style={styles.sheetContainer}
+            contentContainerStyle={styles.sheetContent}
+            showsVerticalScrollIndicator={false}
           >
-            {/* Left Column */}
-            <View style={styles.leftCol}>
-              {/* Progress Stepper */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>📍 Journey Progress</Text>
-                <View style={styles.stepper}>
-                  {STATUS_STEPS.map((step, i) => {
-                    const isCompleted = i <= currentStepIndex;
-                    const isCurrent = i === currentStepIndex;
-                    return (
-                      <View key={step.key} style={styles.stepRow}>
-                        <View style={styles.stepIndicatorCol}>
-                          <View
-                            style={[
-                              styles.stepCircle,
-                              isCompleted && styles.stepCircleActive,
-                              isCurrent && styles.stepCircleCurrent,
-                            ]}
-                          >
-                            <Text style={styles.stepCircleText}>
-                              {isCompleted ? step.icon : "○"}
-                            </Text>
-                          </View>
-                          {i < STATUS_STEPS.length - 1 && (
-                            <View
-                              style={[
-                                styles.stepConnector,
-                                i < currentStepIndex && styles.stepConnectorActive,
-                              ]}
-                            />
-                          )}
-                        </View>
-                        <View style={styles.stepInfo}>
-                          <Text
-                            style={[styles.stepLabel, isCompleted && styles.stepLabelActive]}
-                          >
-                            {step.label}
-                          </Text>
-                          <Text style={styles.stepTime}>{getStatusTime(step.key)}</Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
+            {/* ETA & Status Header */}
+            <View style={styles.etaHeader}>
+              <View style={styles.etaLeft}>
+                <Text style={styles.etaText}>{getETA()}</Text>
+                <Text style={styles.etaSubText}>
+                  {order.status === "pending"
+                    ? "Waiting for a volunteer to accept..."
+                    : order.status === "delivered"
+                    ? "Your order has been safely delivered."
+                    : "Your delivery partner is on the way."}
+                </Text>
               </View>
-
-              {/* Map */}
-              {isActive && (
-                <View style={styles.card}>
-                  <View style={styles.mapContainer}>
-                    {MapView && volunteerLocation ? (
-                      <MapView
-                        style={styles.map}
-                        initialRegion={{
-                          ...volunteerLocation,
-                          latitudeDelta: 0.01,
-                          longitudeDelta: 0.01,
-                        }}
-                        region={
-                          volunteerLocation
-                            ? { ...volunteerLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-                            : undefined
-                        }
-                      >
-                        {volunteerLocation && Marker && (
-                          <Marker coordinate={volunteerLocation} title="Volunteer" />
-                        )}
-                      </MapView>
-                    ) : (
-                      <View style={styles.mapPlaceholder}>
-                        <Text style={{ fontSize: 40 }}>🗺️</Text>
-                        <Text style={styles.mapPlaceholderText}>
-                          {volunteerLocation
-                            ? "Map unavailable on web"
-                            : "Waiting for volunteer location..."}
-                        </Text>
-                        {volunteerLocation && (
-                          <Text style={styles.coordsText}>
-                            📍 {volunteerLocation.latitude.toFixed(4)}, {volunteerLocation.longitude.toFixed(4)}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-                    {volunteerLocation && (
-                      <View style={styles.liveBadge}>
-                        <Animated.View
-                          style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]}
-                        />
-                        <Text style={styles.liveText}>Live tracking</Text>
-                      </View>
-                    )}
-                  </View>
+              {order.status !== "delivered" && order.status !== "cancelled" && (
+                <View style={styles.animatedProgressContainer}>
+                  <View style={styles.animatedProgressBar} />
                 </View>
               )}
             </View>
 
-            {/* Right Column */}
-            <View style={styles.rightCol}>
-              {/* Volunteer Info */}
-              {order.volunteer && (
-                <View style={styles.card}>
-                  <View style={styles.volunteerHeader}>
-                    <View style={styles.volunteerAvatar}>
-                      <Text style={styles.volunteerAvatarText}>
-                        {order.volunteer.name?.charAt(0)?.toUpperCase() || "V"}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={styles.volunteerName}>{order.volunteer.name}</Text>
-                      <Text style={styles.volunteerRole}>Your Delivery Volunteer</Text>
-                    </View>
-                  </View>
+            {/* Horizontal Zomato Stepper */}
+            <View style={styles.stepperContainer}>
+              {STATUS_STEPS.map((step, i) => {
+                const isCompleted = i <= currentStepIndex;
+                const isCurrent = i === currentStepIndex;
 
-                  {order.volunteer.phone && (
-                    <View style={styles.contactRow}>
-                      <TouchableOpacity
-                        style={styles.contactBtn}
-                        onPress={() => Linking.openURL(`tel:${order.volunteer.phone}`)}
-                      >
-                        <Text style={styles.contactBtnIcon}>📞</Text>
-                        <Text style={styles.contactBtnText}>Call</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.contactBtn}
-                        onPress={() => Linking.openURL(`sms:${order.volunteer.phone}`)}
-                      >
-                        <Text style={styles.contactBtnIcon}>💬</Text>
-                        <Text style={styles.contactBtnText}>Message</Text>
-                      </TouchableOpacity>
+                return (
+                  <View key={step.key} style={styles.stepWrapper}>
+                    <View style={styles.stepNodeContainer}>
+                      <View style={[
+                        styles.stepCircle,
+                        isCompleted && styles.stepCircleCompleted,
+                        isCurrent && styles.stepCircleCurrent
+                      ]}>
+                        <Text style={[
+                          styles.stepIcon,
+                          isCompleted && styles.stepIconActive,
+                          isCurrent && { fontSize: 16 }
+                        ]}>
+                          {isCompleted ? step.icon : ""}
+                        </Text>
+                      </View>
+                      {/* Current step pulse effect */}
+                      <Animated.View style={[
+                        styles.stepPulse,
+                        { transform: [{ scale: pulseAnim }], opacity: isCurrent ? 0.5 : 0 }
+                      ]} />
                     </View>
-                  )}
+
+                    <Text style={[styles.stepLabelText, isCompleted && styles.stepLabelTextActive]}>
+                      {step.label}
+                    </Text>
+
+                    {/* Connecting Line */}
+                    {i < STATUS_STEPS.length - 1 && (
+                      <View style={[
+                        styles.stepLine,
+                        i < currentStepIndex && styles.stepLineActive
+                      ]} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Volunteer Partner Card */}
+            {order.volunteer && (
+              <View style={styles.partnerCard}>
+                <View style={styles.partnerInfo}>
+                  <View style={styles.partnerAvatarBox}>
+                    <Text style={styles.partnerAvatarText}>
+                      {order.volunteer.name?.charAt(0).toUpperCase()}
+                    </Text>
+                    <View style={styles.partnerActiveDot} />
+                  </View>
+                  <View>
+                    <Text style={styles.partnerName}>{order.volunteer.name}</Text>
+                    <Text style={styles.partnerRole}>Delivery Partner</Text>
+                  </View>
                 </View>
-              )}
 
-              {/* Delivery Items */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>
-                  {order.category === "medicine" ? "💊" : "🛒"} Delivery Items
-                </Text>
-                {order.items?.map((item, i) => (
-                  <View key={i} style={styles.deliveryItem}>
-                    <View style={styles.deliveryItemLeft}>
-                      <Text style={styles.deliveryItemName}>{item.name}</Text>
-                      {item.notes ? (
-                        <Text style={styles.deliveryItemNote}>{item.notes}</Text>
-                      ) : null}
-                    </View>
-                    <View style={styles.deliveryItemRight}>
-                      <Text style={styles.deliveryItemQty}>×{item.quantity}</Text>
-                      {item.urgent && (
-                        <View style={styles.urgentBadge}>
-                          <Text style={styles.urgentText}>URGENT</Text>
-                        </View>
-                      )}
-                    </View>
+                {order.volunteer.phone && isActive && (
+                  <View style={styles.partnerActions}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => Linking.openURL(`tel:${order.volunteer.phone}`)}
+                    >
+                      <Text style={styles.actionBtnIcon}>📞</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => Linking.openURL(`sms:${order.volunteer.phone}`)}
+                    >
+                      <Text style={styles.actionBtnIcon}>💬</Text>
+                    </TouchableOpacity>
                   </View>
-                ))}
+                )}
+              </View>
+            )}
+
+            {/* Order Details Details */}
+            <View style={styles.detailsCard}>
+              <View style={styles.detailsHeader}>
+                <Text style={styles.detailsTitle}>
+                  {order.category === "medicine" ? "💊 Medicine" : "🛒 Grocery"} Order 
+                </Text>
+                <Text style={styles.detailsOrderId}>#{order._id.slice(-6).toUpperCase()}</Text>
               </View>
 
-              {/* Special Instructions */}
+              <View style={styles.divider} />
+
+              {order.items?.map((item, i) => (
+                <View key={i} style={styles.itemRow}>
+                  <View style={styles.itemBullet} />
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    {item.notes ? (
+                      <Text style={styles.itemNotes}>{item.notes}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.itemQty}>x{item.quantity}</Text>
+                </View>
+              ))}
+
+              <View style={styles.divider} />
+
+              <View style={styles.addressSection}>
+                <Text style={styles.addressIcon}>📍</Text>
+                <View>
+                  <Text style={styles.addressLabel}>Delivery Address</Text>
+                  <Text style={styles.addressText}>{order.deliveryAddress}</Text>
+                </View>
+              </View>
+
               {order.specialInstructions ? (
-                <View style={[styles.card, styles.instructionCard]}>
-                  <Text style={styles.instructionLabel}>📢 SPECIAL INSTRUCTIONS</Text>
-                  <Text style={styles.instructionText}>{order.specialInstructions}</Text>
+                <View style={styles.instructionSection}>
+                  <Text style={styles.instructionIcon}>📝</Text>
+                  <View>
+                    <Text style={styles.addressLabel}>Special Instructions</Text>
+                    <Text style={styles.addressText}>{order.specialInstructions}</Text>
+                  </View>
                 </View>
               ) : null}
-
-              {/* Delivery Address */}
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>📍 Delivery Address</Text>
-                <Text style={styles.addressText}>{order.deliveryAddress}</Text>
-              </View>
             </View>
-          </View>
 
-          {/* Reschedule Banner */}
-          {isActive && (
-            <View style={styles.rescheduleBanner}>
-              <View style={styles.rescheduleLeft}>
-                <Text style={styles.rescheduleIcon}>🔔</Text>
-                <View>
-                  <Text style={styles.rescheduleTitle}>Need to update?</Text>
-                  <Text style={styles.rescheduleDesc}>
-                    You can update special instructions before delivery
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.rescheduleBtn}>
-                <Text style={styles.rescheduleBtnText}>Update Instructions</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={{ height: responsive.showBottomBar ? 80 : 40 }} />
-        </ScrollView>
+            <View style={{ height: responsive.showBottomBar ? 80 : 40 }} />
+          </ScrollView>
+        </View>
 
         <ElderMobileBottomBar navigation={navigation} activeKey="DeliveryOrderScreen" />
       </View>
@@ -393,91 +353,15 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   layout: { flex: 1 },
-  content: { flex: 1 },
-  contentInner: {},
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
+  mainContent: { flex: 1, position: "relative" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
   loadingText: { color: colors.muted, fontSize: 16 },
 
-  // Header
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
-  },
-  statusBadge: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.success,
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  heading: { fontSize: 28, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
-  etaCard: {
-    backgroundColor: colors.primaryDark,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  etaLabel: { fontSize: 11, color: "#FFF", opacity: 0.8, fontWeight: "600" },
-  etaTime: { fontSize: 24, fontWeight: "800", color: "#FFF", marginTop: 4 },
-
-  // Grid
-  mainGrid: { gap: 20 },
-  leftCol: { flex: 2, gap: 20 },
-  rightCol: { flex: 1, gap: 20, minWidth: 280 },
-
-  // Card
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 20,
-  },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 16 },
-
-  // Stepper
-  stepper: {},
-  stepRow: { flexDirection: "row", alignItems: "flex-start" },
-  stepIndicatorCol: { alignItems: "center", width: 40 },
-  stepCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: colors.border,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.bg,
-  },
-  stepCircleActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + "20",
-  },
-  stepCircleCurrent: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-  },
-  stepCircleText: { fontSize: 14 },
-  stepConnector: {
-    width: 2,
-    height: 32,
-    backgroundColor: colors.border,
-    marginVertical: 2,
-  },
-  stepConnectorActive: { backgroundColor: colors.primary },
-  stepInfo: { marginLeft: 14, paddingBottom: 20, flex: 1 },
-  stepLabel: { fontSize: 15, fontWeight: "600", color: colors.muted },
-  stepLabelActive: { color: colors.text },
-  stepTime: { fontSize: 12, color: colors.muted, marginTop: 2 },
-
-  // Map
-  mapContainer: {
-    height: 220,
-    borderRadius: 12,
-    overflow: "hidden",
+  // Map Area
+  mapSection: {
+    height: Platform.OS === "web" ? "55%" : SCREEN_HEIGHT * 0.5,
+    width: "100%",
+    backgroundColor: "#111",
     position: "relative",
   },
   map: { flex: 1 },
@@ -485,121 +369,322 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.bg,
-    borderRadius: 12,
-    gap: 8,
+    backgroundColor: "#111",
   },
-  mapPlaceholderText: { color: colors.muted, fontSize: 14 },
-  coordsText: { color: colors.primary, fontSize: 13, fontWeight: "600" },
-  liveBadge: {
+  mapPlaceholderText: { color: colors.muted },
+  liveBadgeOverlay: {
     position: "absolute",
-    bottom: 12,
-    left: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.card + "E0",
+    top: 20,
+    left: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.success,
+    backgroundColor: colors.primary,
   },
-  liveText: { color: colors.text, fontSize: 12, fontWeight: "600" },
+  liveTextLabel: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
 
-  // Volunteer
-  volunteerHeader: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 14 },
-  volunteerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.primary + "30",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  volunteerAvatarText: { fontSize: 22, fontWeight: "700", color: colors.primary },
-  volunteerName: { fontSize: 17, fontWeight: "700", color: colors.text },
-  volunteerRole: { fontSize: 13, color: colors.primary, fontWeight: "500" },
-  contactRow: { flexDirection: "row", gap: 12 },
-  contactBtn: {
+  // Bottom Sheet Overlays
+  sheetContainer: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 10,
+    marginTop: -20, // Overlays map slightly
     backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sheetContent: {
+    padding: 24,
+    gap: 20,
+  },
+
+  // ETA Header
+  etaHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  etaLeft: { flex: 1 },
+  etaText: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  etaSubText: {
+    fontSize: 14,
+    color: colors.muted,
+    marginTop: 4,
+  },
+  animatedProgressContainer: {
+    width: 60,
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  animatedProgressBar: {
+    width: "60%",
+    height: "100%",
+    backgroundColor: colors.accent,
+    borderRadius: 3,
+  },
+
+  // Stepper
+  stepperContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  stepWrapper: {
+    alignItems: "center",
+    flex: 1,
+    position: "relative",
+  },
+  stepNodeContainer: {
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  stepCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  stepCircleCompleted: {
+    backgroundColor: colors.primary,
+  },
+  stepCircleCurrent: {
+    backgroundColor: colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  stepPulse: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.pulse,
+    zIndex: 1,
+  },
+  stepIcon: {
+    fontSize: 12,
+    color: "#fff",
+    opacity: 0,
+  },
+  stepIconActive: {
+    opacity: 1,
+  },
+  stepLabelText: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 8,
+    textAlign: "center",
+    fontWeight: "500",
+    width: 70,
+  },
+  stepLabelTextActive: {
+    color: colors.text,
+    fontWeight: "700",
+  },
+  stepLine: {
+    position: "absolute",
+    top: 18,
+    left: "50%",
+    right: "-50%",
+    height: 2,
+    backgroundColor: colors.border,
+    zIndex: 1,
+  },
+  stepLineActive: {
+    backgroundColor: colors.primary,
+  },
+
+  // Partner Card
+  partnerCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  contactBtnIcon: { fontSize: 16 },
-  contactBtnText: { color: colors.text, fontWeight: "600", fontSize: 13 },
-
-  // Delivery items
-  deliveryItem: {
+  partnerInfo: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border + "50",
+    gap: 14,
   },
-  deliveryItemLeft: { flex: 1 },
-  deliveryItemName: { fontSize: 15, fontWeight: "600", color: colors.text },
-  deliveryItemNote: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  deliveryItemRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  deliveryItemQty: { fontSize: 14, color: colors.muted, fontWeight: "600" },
-  urgentBadge: {
-    backgroundColor: colors.danger + "20",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.danger,
+  partnerAvatarBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#334155",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
-  urgentText: { fontSize: 9, fontWeight: "800", color: colors.danger },
-
-  // Instructions
-  instructionCard: {
-    borderColor: colors.primary + "40",
-    backgroundColor: colors.primary + "08",
-  },
-  instructionLabel: {
-    fontSize: 11,
+  partnerAvatarText: {
+    color: "#FFF",
+    fontSize: 20,
     fontWeight: "700",
-    color: colors.primary,
-    letterSpacing: 1,
-    marginBottom: 8,
   },
-  instructionText: { fontSize: 14, color: colors.text, lineHeight: 20 },
-  addressText: { fontSize: 14, color: colors.text, lineHeight: 20 },
-
-  // Reschedule banner
-  rescheduleBanner: {
+  partnerActiveDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
+  partnerName: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  partnerRole: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  partnerActions: {
     flexDirection: "row",
+    gap: 10,
+  },
+  actionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(96, 178, 70, 0.15)",
+    justifyContent: "center",
     alignItems: "center",
+  },
+  actionBtnIcon: {
+    fontSize: 18,
+  },
+
+  // Details Card
+  detailsCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  detailsHeader: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: colors.danger,
-    borderRadius: 14,
-    padding: 18,
-    marginTop: 20,
+    alignItems: "center",
+    marginBottom: 16,
   },
-  rescheduleLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  rescheduleIcon: { fontSize: 24 },
-  rescheduleTitle: { fontSize: 16, fontWeight: "700", color: "#FFF" },
-  rescheduleDesc: { fontSize: 12, color: "#FFF", opacity: 0.85, marginTop: 2 },
-  rescheduleBtn: {
-    backgroundColor: "#FFF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+  detailsTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700",
   },
-  rescheduleBtnText: { color: colors.danger, fontWeight: "700", fontSize: 13 },
+  detailsOrderId: {
+    color: colors.muted,
+    fontSize: 13,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 16,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  itemBullet: {
+    width: 12,
+    height: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 2,
+    marginTop: 4,
+    marginRight: 12,
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  itemNotes: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  itemQty: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginLeft: 12,
+  },
+  addressSection: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  addressIcon: {
+    fontSize: 18,
+    marginTop: 2,
+  },
+  addressLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  addressText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  instructionSection: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginTop: 16,
+  },
+  instructionIcon: {
+    fontSize: 18,
+    marginTop: 2,
+  },
 });

@@ -117,10 +117,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+    width: "100%",
   },
 
   card: {
-    width: Platform.OS === "web" ? 420 : "100%",
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: colors.card,
     padding: 30,
     borderRadius: 18,

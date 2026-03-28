@@ -6,10 +6,16 @@ import OpenAI from "openai";
 
 const router = express.Router();
 
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
+let openai = null;
+function getOpenAI() {
+  if (!openai && process.env.GROQ_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1",
+    });
+  }
+  return openai;
+}
 
 // CREATE REQUEST
 router.post(
@@ -85,7 +91,12 @@ router.post(
         { role: "user", content: message }
       ];
 
-      const completion = await openai.chat.completions.create({
+      const client = getOpenAI();
+      if (!client) {
+        return res.status(200).json({ reply: "AI chat is not configured. Please set GROQ_API_KEY." });
+      }
+
+      const completion = await client.chat.completions.create({
         model: "llama-3.1-8b-instant",
         messages,
       });

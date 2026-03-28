@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import { auth } from "../config/firebase";
+import { useFocusEffect } from "@react-navigation/native";
+import useResponsive from "../hooks/useResponsive";
 
 const colors = {
   bg: "#0F172A",
@@ -33,37 +35,59 @@ export default function VolunteerDashboard({ navigation }) {
   const [deliveries, setDeliveries] = useState([]);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [loading, setLoading] = useState(true);
+  const responsive = useResponsive();
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const token = await auth.currentUser.getIdToken();
-        const headers = { Authorization: `Bearer ${token}` };
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const fetchDashboard = async () => {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          const headers = { Authorization: `Bearer ${token}` };
 
-        const [availableRes, tasksRes, deliveriesRes, activeRes] = await Promise.all([
-          axios.get("http://localhost:5000/volunteer/requests", { headers }),
-          axios.get("http://localhost:5000/volunteer/tasks", { headers }),
-          axios.get("http://localhost:5000/delivery/available", { headers }),
-          axios.get("http://localhost:5000/delivery/active", { headers }),
-        ]);
+          const [availableRes, tasksRes, deliveriesRes, activeRes, historyRes] = await Promise.all([
+            axios.get("http://localhost:5000/volunteer/requests", { headers }),
+            axios.get("http://localhost:5000/volunteer/tasks", { headers }),
+            axios.get("http://localhost:5000/delivery/available", { headers }),
+            axios.get("http://localhost:5000/delivery/active", { headers }),
+            axios.get("http://localhost:5000/delivery/history", { headers }),
+          ]);
 
-        setAvailable(availableRes.data);
-        setDeliveries(deliveriesRes.data);
-        setActiveDelivery(activeRes.data);
+          if (isActive) {
+            setAvailable(availableRes.data);
+            setDeliveries(deliveriesRes.data);
+            setActiveDelivery(activeRes.data);
 
-        const completedTasks = tasksRes.data
-          .filter((t) => t.status?.toLowerCase() === "completed")
-          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-        setCompleted(completedTasks);
-      } catch (err) {
-        console.log("DASHBOARD ERROR:", err.response?.data || err);
-      } finally {
-        setLoading(false);
-      }
-    };
+            const completedRegular = tasksRes.data
+              .filter((t) => t.status?.toLowerCase() === "completed")
+              .map((t) => ({ ...t, displayType: t.type }));
 
-    fetchDashboard();
-  }, []);
+            const completedDeliveries = historyRes.data
+              .map((d) => ({
+                _id: d._id,
+                displayType: d.category === "medicine" ? "Medicine Delivery" : "Grocery Delivery",
+                description: `Delivered to ${d.elder?.name || "Elder"} at ${d.deliveryAddress}`,
+                status: d.status,
+                updatedAt: d.updatedAt,
+              }));
+
+            const completedTasks = [...completedRegular, ...completedDeliveries]
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            setCompleted(completedTasks);
+          }
+        } catch (err) {
+          console.log("DASHBOARD ERROR:", err.response?.data || err);
+        } finally {
+          if (isActive) setLoading(false);
+        }
+      };
+
+      fetchDashboard();
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const acceptDelivery = async (deliveryId) => {
     try {
@@ -83,9 +107,9 @@ export default function VolunteerDashboard({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.layout}>
-        {/* Sidebar (Web Only) */}
-        {Platform.OS === "web" && (
+      <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
+        {/* Sidebar */}
+        {responsive.showSidebar && (
           <View style={styles.sidebar}>
             <View style={styles.profileSection}>
               <View style={styles.avatar}>
@@ -137,7 +161,7 @@ export default function VolunteerDashboard({ navigation }) {
           ) : (
             <>
               {/* Stats */}
-              <View style={styles.statsRow}>
+              <View style={[styles.statsRow, { flexDirection: responsive.isMobile ? "column" : "row" }]}>
                 <StatCard
                   title="Available Tasks"
                   value={available.length}
@@ -243,10 +267,12 @@ export default function VolunteerDashboard({ navigation }) {
               {completed.slice(0, 3).map((item) => (
                 <View key={item._id} style={styles.activityCard}>
                   <Text style={styles.activityTitle}>
-                    {item.type?.toUpperCase()}
+                    {item.displayType?.toUpperCase() || item.type?.toUpperCase()}
                   </Text>
                   <Text style={styles.activityDesc}>{item.description}</Text>
-                  <Text style={styles.activityStatus}>Completed</Text>
+                  <Text style={styles.activityStatus}>
+                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                  </Text>
                 </View>
               ))}
 
@@ -291,7 +317,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   layout: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
+    flexDirection: "row", // Overridden dynamically below but keeping base as row for styling purposes
     flex: 1,
   },
 
@@ -351,7 +377,8 @@ const styles = StyleSheet.create({
   },
 
   statsRow: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
+    flexDirection: "row", // we will override inline
+    flexWrap: "wrap",
     gap: 20,
     marginBottom: 30,
   },

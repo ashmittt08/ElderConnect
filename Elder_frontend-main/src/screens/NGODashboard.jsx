@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import { auth } from "../config/firebase";
+import useResponsive from "../hooks/useResponsive";
 
 const colors = {
   bg: "#0F172A",
@@ -31,6 +32,7 @@ export default function NGODashboard({ navigation }) {
   const [completedCount, setCompletedCount] = useState(0);
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
+  const responsive = useResponsive();
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -74,8 +76,8 @@ export default function NGODashboard({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.layout}>
-        {Platform.OS === "web" && (
+      <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
+        {responsive.showSidebar && (
           <View style={styles.sidebar}>
             <Text style={styles.logo}>ElderConnect</Text>
             <Text style={styles.hub}>NGO Hub</Text>
@@ -100,7 +102,7 @@ export default function NGODashboard({ navigation }) {
 
           <Text style={styles.sectionTitle}>Key Metrics</Text>
 
-          <View style={styles.metricsRow}>
+          <View style={[styles.metricsRow, { flexDirection: responsive.isMobile ? "column" : "row" }]}>
             <MetricCard
               title="Active Volunteers"
               value={volunteerCount}
@@ -180,7 +182,6 @@ const Table = ({ headers, rows }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   layout: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
     flex: 1,
   },
   sidebar: {
@@ -203,7 +204,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   metricsRow: {
-    flexDirection: Platform.OS === "web" ? "row" : "column",
     gap: 15,
     marginBottom: 30,
   },

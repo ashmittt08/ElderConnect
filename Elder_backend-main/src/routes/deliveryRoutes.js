@@ -265,6 +265,28 @@ router.get(
   }
 );
 
+// ── Volunteer: Get delivery history (completed/cancelled) ──
+router.get(
+  "/history",
+  verifyUser,
+  requireRole("volunteer"),
+  async (req, res) => {
+    try {
+      const history = await DeliveryOrder.find({
+        volunteer: req.user._id,
+        status: { $in: ["delivered", "cancelled"] },
+      })
+        .populate("elder", "name address")
+        .sort({ updatedAt: -1 });
+
+      res.json(history);
+    } catch (err) {
+      console.error("❌ FETCH DELIVERY HISTORY ERROR:", err);
+      res.status(500).json({ message: "Failed to fetch delivery history" });
+    }
+  }
+);
+
 // ── Elder: Cancel a pending order ──
 router.put(
   "/cancel/:id",

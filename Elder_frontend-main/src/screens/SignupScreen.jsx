@@ -172,6 +172,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 30,
     justifyContent: "center",
+    width: "100%",
+    maxWidth: 500,
+    alignSelf: "center",
   },
 
   title: {
