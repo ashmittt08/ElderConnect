@@ -7,20 +7,16 @@
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-
     "ios": {
       "supportsTablet": true
     },
-
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
-
     "web": {
-      "output": "static"
+      "output": "single"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -33,7 +29,6 @@
         }
       ]
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
