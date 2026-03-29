@@ -42,7 +42,7 @@ ElderConnect is a full-stack mobile application that bridges seniors, volunteers
 ## 🛠 Tech Stack
 
 ### Frontend
-- **React Native** (Expo ~54) with TypeScript
+- **React Native** (Expo ~54)
 - **Expo Router** for file-based navigation
 - **React Navigation** (bottom tabs + stack)
 - **Socket.IO Client** for real-time delivery tracking
@@ -107,8 +107,8 @@ ElderConnect/
 - **MongoDB** instance (local or Atlas)
 - **Firebase** project with Authentication enabled
 - **Expo CLI**: `npm install -g expo-cli`
-- (Optional) **Cloudinary** account for image uploads
-- (Optional) **Groq** API key for AI companion chat
+- **Cloudinary** account for image uploads
+- **Groq** API key for AI companion chat
 
 ---
 
@@ -141,7 +141,7 @@ cd Elder_frontend-main
 # 2. Install dependencies
 npm install
 
-# 3. Update the API base URL in src/api.js (or src/config/) to point to your backend
+# 3. Update the API base URL in src/api/index.js (or src/config/network.js) to point to your backend
 
 # 4. Start the Expo development server
 npm start
@@ -176,8 +176,6 @@ CLOUDINARY_API_SECRET=your_api_secret
 # Groq (AI Companion)
 GROQ_API_KEY=your_groq_api_key
 
-# Clerk (optional)
-CLERK_SECRET_KEY=your_clerk_secret_key
 ```
 
 ---
