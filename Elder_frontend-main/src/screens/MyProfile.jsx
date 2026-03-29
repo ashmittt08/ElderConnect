@@ -12,7 +12,7 @@ import {
 import { useContext, useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
-import axios from "axios";
+import api from "../api";
 import * as ImagePicker from "expo-image-picker";
 import { auth } from "../config/firebase";
 import { useNavigation } from "@react-navigation/native";
@@ -29,6 +29,11 @@ const colors = {
   muted: "#94A3B8",
 };
 
+const SUGGESTIONS = {
+  cities: ["Bhopal", "Indore", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", "Pune", "Jaipur", "Lucknow", "Nagpur", "Noida", "Gurgaon", "Chandigarh"],
+  states: ["Madhya Pradesh", "Maharashtra", "Delhi", "Karnataka", "Telangana", "Gujarat", "Tamil Nadu", "West Bengal", "Rajasthan", "Uttar Pradesh", "Haryana", "Punjab"]
+};
+
 export default function MyProfile() {
   const { user, login, loading } = useContext(AuthContext);
 
@@ -40,6 +45,14 @@ export default function MyProfile() {
   const [uploading, setUploading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Address parts
+  const [locality, setLocality] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [stateSuggestions, setStateSuggestions] = useState([]);
 
   const navigation = useNavigation();
 
@@ -55,7 +68,14 @@ export default function MyProfile() {
   useEffect(() => {
     if (user) {
       setPhone(user.phone || "");
-      setAddress(user.address || "");
+      
+      const addr = user.address || "";
+      const parts = addr.split(',').map(p => p.trim());
+      setLocality(parts[0] || "");
+      setCity(parts[1] || "");
+      setState(parts[2] || "");
+      setAddress(addr);
+
       setGender(user.gender || "");
       setEmergencyContact(user.emergencyContact || "");
       setProfilePhoto(user.profilePhoto || null);
@@ -161,6 +181,26 @@ export default function MyProfile() {
     return json.secure_url;
   };
 
+  const handleCityChange = (text) => {
+    setCity(text);
+    if (text.length > 1) {
+      const filtered = SUGGESTIONS.cities.filter(c => c.toLowerCase().includes(text.toLowerCase()));
+      setCitySuggestions(filtered);
+    } else {
+      setCitySuggestions([]);
+    }
+  };
+
+  const handleStateChange = (text) => {
+    setState(text);
+    if (text.length > 1) {
+      const filtered = SUGGESTIONS.states.filter(s => s.toLowerCase().includes(text.toLowerCase()));
+      setStateSuggestions(filtered);
+    } else {
+      setStateSuggestions([]);
+    }
+  };
+
   const saveProfile = async () => {
     try {
       setUploading(true);
@@ -178,18 +218,17 @@ export default function MyProfile() {
          finalProfilePhoto = profilePhoto;
       }
 
-      const res = await axios.put(
-        "http://localhost:5000/auth/update-profile",
+      const fullAddress = `${locality}, ${city}, ${state}`;
+
+      const res = await api.put(
+        "/auth/update-profile",
         {
           phone,
-          address,
+          address: fullAddress,
           gender,
           emergencyContact,
           idFrontUrl: imageUrl,
           profilePhoto: finalProfilePhoto,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -272,33 +311,72 @@ export default function MyProfile() {
           )}
 
           {isEditing ? (
-            <TextInput
-              placeholder="Address"
-              value={address}
-              onChangeText={setAddress}
-              style={styles.input}
-              placeholderTextColor={colors.muted}
-            />
+            <View style={{ gap: 10 }}>
+              <TextInput
+                placeholder="Locality / Area Name"
+                value={locality}
+                onChangeText={setLocality}
+                style={styles.input}
+                placeholderTextColor={colors.muted}
+              />
+              <TextInput
+                placeholder="City / District"
+                value={city}
+                onChangeText={handleCityChange}
+                style={styles.input}
+                placeholderTextColor={colors.muted}
+              />
+              {citySuggestions.length > 0 && (
+                <View style={styles.suggestions}>
+                  {citySuggestions.map((s, i) => (
+                    <TouchableOpacity key={i} onPress={() => { setCity(s); setCitySuggestions([]); }} style={styles.suggestionItem}>
+                      <Text style={styles.suggestionText}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <TextInput
+                placeholder="State"
+                value={state}
+                onChangeText={handleStateChange}
+                style={styles.input}
+                placeholderTextColor={colors.muted}
+              />
+              {stateSuggestions.length > 0 && (
+                <View style={styles.suggestions}>
+                  {stateSuggestions.map((s, i) => (
+                    <TouchableOpacity key={i} onPress={() => { setState(s); setStateSuggestions([]); }} style={styles.suggestionItem}>
+                      <Text style={styles.suggestionText}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           ) : (
             <View style={styles.detailRow}>
               <Text style={styles.label}>Address</Text>
-              <Text style={styles.value}>{address || "Not set"}</Text>
+              <Text style={styles.value}>
+                {locality ? `${locality}, ${city}, ${state}` : "Not set"}
+              </Text>
             </View>
           )}
 
-          {isEditing ? (
-            <TextInput
-              placeholder="Gender"
-              value={gender}
-              onChangeText={setGender}
-              style={styles.input}
-              placeholderTextColor={colors.muted}
-            />
-          ) : (
-            <View style={styles.detailRow}>
-              <Text style={styles.label}>Gender</Text>
-              <Text style={styles.value}>{gender || "Not set"}</Text>
-            </View>
+          {user?.role !== "ngo" && (
+            isEditing ? (
+              <TextInput
+                placeholder="Gender"
+                value={gender}
+                onChangeText={setGender}
+                style={styles.input}
+                placeholderTextColor={colors.muted}
+              />
+            ) : (
+              <View style={styles.detailRow}>
+                <Text style={styles.label}>Gender</Text>
+                <Text style={styles.value}>{gender || "Not set"}</Text>
+              </View>
+            )
           )}
 
           {user?.role === "elder" && (
@@ -589,5 +667,24 @@ const styles = StyleSheet.create({
   rejectionText: {
     color: colors.danger,
     marginTop: 10,
+  },
+
+  // Suggestions styles
+  suggestions: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: 150,
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  suggestionText: {
+    color: colors.text,
   },
 });

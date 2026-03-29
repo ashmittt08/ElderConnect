@@ -15,7 +15,7 @@ const verifyUser = async (req, res, next) => {
     const user = await User.findOne({ uid: decoded.uid });
 
     if (!user) {
-      return res.status(200).json( null );
+      return res.status(404).json({ message: "User not found in database" });
     }
 
     req.user = user;   // 🔥 MONGO USER DOC

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 
 export default function AssignVolunteer({ route, navigation }) {
@@ -23,9 +23,8 @@ export default function AssignVolunteer({ route, navigation }) {
       try {
         const token = await auth.currentUser.getIdToken();
 
-        const res = await axios.get(
-          "http://localhost:5000/ngo/volunteers",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          "/ngo/volunteers"
         );
 
         setVolunteers(res.data);
@@ -45,10 +44,9 @@ export default function AssignVolunteer({ route, navigation }) {
 
       const token = await auth.currentUser.getIdToken();
 
-      await axios.post(
-        "http://localhost:5000/ngo/assign",
-        { requestId, volunteerId },
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        "/ngo/assign",
+        { requestId, volunteerId }
       );
 
       alert("Volunteer assigned successfully ✅");

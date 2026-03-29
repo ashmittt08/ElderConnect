@@ -1,5 +1,6 @@
 import express from "express";
 import Request from "../models/Request.js";
+import User from "../models/User.js";
 import verifyUser from "../middleware/verifyUser.js";
 import requireRole from "../middleware/requireRole.js";
 
@@ -114,7 +115,20 @@ router.get(
   requireRole("volunteer"),
   async (req, res) => {
     try {
-      const ngos = await User.find({ role: "ngo", approved: true }).select(
+      const user = req.user;
+      let query = { role: "ngo", approved: true };
+
+      if (user.address) {
+        const parts = user.address.split(',').map(p => p.trim());
+        if (parts.length >= 2) {
+          const city = parts[parts.length - 2];
+          if (city) {
+            query.address = { $regex: city, $options: 'i' };
+          }
+        }
+      }
+
+      const ngos = await User.find(query).select(
         "name address phone profilePhoto email"
       );
       res.status(200).json(ngos);

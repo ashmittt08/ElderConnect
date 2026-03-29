@@ -1,6 +1,8 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Location from "expo-location";
 import { AuthContext } from "../context/AuthContext";
 import api from "../api";
 
@@ -14,6 +16,11 @@ const colors = {
   muted: "#94A3B8",
 };
 
+const SUGGESTIONS = {
+  cities: ["Bhopal", "Indore", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", "Pune", "Jaipur", "Lucknow", "Nagpur", "Noida", "Gurgaon", "Chandigarh"],
+  states: ["Madhya Pradesh", "Maharashtra", "Delhi", "Karnataka", "Telangana", "Gujarat", "Tamil Nadu", "West Bengal", "Rajasthan", "Uttar Pradesh", "Haryana", "Punjab"]
+};
+
 export default function EventsScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const [events, setEvents] = useState([]);
@@ -22,8 +29,19 @@ export default function EventsScreen({ navigation }) {
   // For NGO Event Creation
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [location, setLocation] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Location components
+  const [locality, setLocality] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  
+  // Autocomplete states
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [stateSuggestions, setStateSuggestions] = useState([]);
+  
+  const [fetchingLocation, setFetchingLocation] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const fetchEvents = useCallback(async () => {
@@ -43,15 +61,24 @@ export default function EventsScreen({ navigation }) {
   }, [fetchEvents]);
 
   const handleCreateEvent = async () => {
-    if (!title || !description || !date || !location) {
+    const fullLocation = `${locality}, ${city}, ${state}`;
+    if (!title || !description || !date || !locality || !city || !state) {
       Alert.alert("Error", "Please fill all fields");
       return;
     }
     try {
       setCreating(true);
-      await api.post("/events", { title, description, date, location });
+      await api.post("/events", { 
+        title, 
+        description, 
+        date: date.toISOString(), 
+        location: fullLocation 
+      });
       Alert.alert("Success", "Event created successfully!");
-      setTitle(""); setDescription(""); setDate(""); setLocation("");
+      setTitle(""); 
+      setDescription(""); 
+      setDate(new Date()); 
+      setLocality(""); setCity(""); setState("");
       fetchEvents();
     } catch (err) {
       Alert.alert("Error", err.response?.data?.message || "Failed to create event");
@@ -59,6 +86,34 @@ export default function EventsScreen({ navigation }) {
       setCreating(false);
     }
   };
+
+  const handleCityChange = (val) => {
+    setCity(val);
+    if (val.length > 0) {
+      const filtered = SUGGESTIONS.cities.filter(c => c.toLowerCase().includes(val.toLowerCase()));
+      setCitySuggestions(filtered);
+    } else {
+      setCitySuggestions([]);
+    }
+  };
+
+  const handleStateChange = (val) => {
+    setState(val);
+    if (val.length > 0) {
+      const filtered = SUGGESTIONS.states.filter(s => s.toLowerCase().includes(val.toLowerCase()));
+      setStateSuggestions(filtered);
+    } else {
+      setStateSuggestions([]);
+    }
+  };
+
+  const onChangeDate = (event, selectedDate) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(Platform.OS === 'ios');
+    setDate(currentDate);
+  };
+
+
 
   const handleJoinEvent = async (eventId) => {
     try {
@@ -89,8 +144,81 @@ export default function EventsScreen({ navigation }) {
             <Text style={styles.createTitle}>Post a New Event</Text>
             <TextInput style={styles.input} placeholder="Event Title" placeholderTextColor={colors.muted} value={title} onChangeText={setTitle} />
             <TextInput style={styles.input} placeholder="Description" placeholderTextColor={colors.muted} value={description} onChangeText={setDescription} multiline />
-            <TextInput style={styles.input} placeholder="Date (e.g. 2026-12-01)" placeholderTextColor={colors.muted} value={date} onChangeText={setDate} />
-            <TextInput style={styles.input} placeholder="Location" placeholderTextColor={colors.muted} value={location} onChangeText={setLocation} />
+            
+            {Platform.OS === 'web' ? (
+              <TextInput
+                style={styles.input}
+                type="date"
+                value={date.toISOString().split('T')[0]}
+                onChangeText={(val) => setDate(new Date(val))}
+              />
+            ) : (
+              <>
+                <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+                  <Text style={{ color: date ? colors.text : colors.muted }}>
+                    📅 {date ? date.toDateString() : "Select Date"}
+                  </Text>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={date}
+                    mode="date"
+                    display="default"
+                    onChange={onChangeDate}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </>
+            )}
+
+            <View style={styles.locationGroup}>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Locality / Area" 
+                placeholderTextColor={colors.muted} 
+                value={locality} 
+                onChangeText={setLocality} 
+              />
+
+              <View style={{zIndex: 10}}>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="City / District" 
+                  placeholderTextColor={colors.muted} 
+                  value={city} 
+                  onChangeText={handleCityChange} 
+                />
+                {citySuggestions.length > 0 && (
+                  <View style={styles.suggestions}>
+                    {citySuggestions.map((item, i) => (
+                      <TouchableOpacity key={i} onPress={() => { setCity(item); setCitySuggestions([]); }} style={styles.suggestionItem}>
+                        <Text style={styles.suggestionText}>{item}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={{zIndex: 5}}>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="State" 
+                  placeholderTextColor={colors.muted} 
+                  value={state} 
+                  onChangeText={handleStateChange} 
+                />
+                {stateSuggestions.length > 0 && (
+                  <View style={styles.suggestions}>
+                    {stateSuggestions.map((item, i) => (
+                      <TouchableOpacity key={i} onPress={() => { setState(item); setStateSuggestions([]); }} style={styles.suggestionItem}>
+                        <Text style={styles.suggestionText}>{item}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
             
             <TouchableOpacity style={styles.submitBtn} onPress={handleCreateEvent} disabled={creating}>
               <Text style={styles.submitText}>{creating ? "Creating..." : "Create Event"}</Text>
@@ -144,7 +272,17 @@ const styles = StyleSheet.create({
   subheading: { fontSize: 15, color: colors.muted, marginBottom: 20 },
   createCard: { backgroundColor: colors.card, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 20 },
   createTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, marginBottom: 15 },
-  input: { backgroundColor: colors.bg, color: colors.text, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
+  input: { backgroundColor: colors.bg, color: colors.text, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 10, justifyContent: 'center' },
+  locationGroup: { gap: 2, marginBottom: 10 },
+  inputRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  locationBtnSmall: { backgroundColor: colors.primary, width: 45, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  suggestions: { 
+    position: 'absolute', top: 52, left: 0, right: 0, 
+    backgroundColor: colors.card, borderRadius: 8, borderWidth: 1, borderColor: colors.border,
+    maxHeight: 150, overflow: 'hidden', shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 5, elevation: 5
+  },
+  suggestionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  suggestionText: { color: colors.text },
   submitBtn: { backgroundColor: colors.success, padding: 14, borderRadius: 8, alignItems: "center", marginTop: 5 },
   submitText: { color: "#FFF", fontWeight: "bold", fontSize: 16 },
   list: { gap: 15 },

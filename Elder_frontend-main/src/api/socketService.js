@@ -1,6 +1,8 @@
+import { Platform } from "react-native";
 import { io } from "socket.io-client";
+import { HOST_IP, PORT } from "../config/network";
 
-const SOCKET_URL = "http://localhost:5000";
+const SOCKET_URL = Platform.OS === "android" ? `http://${HOST_IP}:${PORT}` : `http://localhost:${PORT}`;
 
 let socket = null;
 

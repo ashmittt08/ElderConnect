@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 
 const colors = {
@@ -31,9 +31,8 @@ export default function AvailableRequests() {
       try {
         const token = await auth.currentUser.getIdToken();
 
-        const res = await axios.get(
-          "http://localhost:5000/volunteer/requests",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          "/volunteer/requests"
         );
 
         setRequests(res.data);
@@ -52,10 +51,9 @@ export default function AvailableRequests() {
       setProcessingId(id);
       const token = await auth.currentUser.getIdToken();
 
-      await axios.post(
-        `http://localhost:5000/volunteer/accept/${id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        `/volunteer/accept/${id}`,
+        {}
       );
 
       Alert.alert("Success", "Request accepted!");

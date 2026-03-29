@@ -18,7 +18,8 @@ import api from "../api";
 import { AuthContext } from "../context/AuthContext";
 import useResponsive from "../hooks/useResponsive";
 
-import { MapView } from "../components/MapModule";
+import * as SecureStore from "expo-secure-store";
+import { MapView, Marker } from "../components/MapModule";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -83,6 +84,7 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
   useEffect(() => {
     const fetchOrder = async () => {
       try {
+        if (!orderId) return;
         const res = await api.get(`/delivery/order/${orderId}`);
         setOrder(res.data);
       } catch (err) {
@@ -91,8 +93,32 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
         setLoading(false);
       }
     };
-    if (orderId) fetchOrder();
+    fetchOrder();
   }, [orderId]);
+
+  // Persistence for checklists
+  useEffect(() => {
+    const loadChecklist = async () => {
+      try {
+        const saved = await SecureStore.getItemAsync(`checklist_${orderId}`);
+        if (saved) setCheckedItems(JSON.parse(saved));
+      } catch (e) {
+        console.warn("Failed to load checklist", e);
+      }
+    };
+    if (orderId) loadChecklist();
+  }, [orderId]);
+
+  useEffect(() => {
+    const saveChecklist = async () => {
+      try {
+        await SecureStore.setItemAsync(`checklist_${orderId}`, JSON.stringify(checkedItems));
+      } catch (e) {
+        console.warn("Failed to save checklist", e);
+      }
+    };
+    if (orderId && Object.keys(checkedItems).length > 0) saveChecklist();
+  }, [checkedItems, orderId]);
 
   // Live location broadcasting & Local state updating
   useEffect(() => {
@@ -236,9 +262,25 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
         {isActive ? (
           <MapView
             style={styles.map}
-            volunteer={currentLocation}
-            destination={mockDestination}
-          />
+            initialRegion={{
+              ...(currentLocation || mockDestination),
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+          >
+            {currentLocation && (
+              <Marker
+                coordinate={currentLocation}
+                title="Your Location"
+                pinColor={colors.primary}
+              />
+            )}
+            <Marker
+              coordinate={mockDestination}
+              title="Destination"
+              pinColor={colors.accent}
+            />
+          </MapView>
         ) : (
           <View style={styles.mapPlaceholder}>
             <Text style={styles.mapPlaceholderText}>Map unavailable</Text>
@@ -345,6 +387,13 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
             <View style={styles.recipientInfo}>
               <Text style={styles.recipientName}>{elderInfo.name}</Text>
               <Text style={styles.recipientAddress}>{order.deliveryAddress}</Text>
+              <TouchableOpacity
+                style={styles.detailsNavBtn}
+                onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.deliveryAddress)}`)}
+              >
+                <Text style={styles.detailsNavIcon}>📍</Text>
+                <Text style={styles.detailsNavText}>Open Directions</Text>
+              </TouchableOpacity>
             </View>
           </View>
           
@@ -660,7 +709,22 @@ const styles = StyleSheet.create({
   recipientAvatarText: { fontSize: 20, fontWeight: "700", color: "#FFF" },
   recipientInfo: { flex: 1 },
   recipientName: { fontSize: 18, fontWeight: "700", color: colors.text },
-  recipientAddress: { fontSize: 14, color: colors.muted, marginTop: 4, lineHeight: 20 },
+  recipientAddress: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
+  detailsNavBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.bg,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignSelf: "flex-start",
+    marginTop: 10,
+  },
+  detailsNavIcon: { fontSize: 12 },
+  detailsNavText: { color: colors.primary, fontWeight: "700", fontSize: 13 },
   contactActionsRow: {
     flexDirection: "row",
     gap: 12,

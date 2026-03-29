@@ -29,7 +29,7 @@ export default function NGOsScreen({ navigation }) {
       const endpoint = user.role === "elder" ? "/elder/ngos" : "/volunteer/ngos";
       const [ngosRes, profileRes] = await Promise.all([
         api.get(endpoint),
-        api.get("/profile") 
+        api.get("/auth/me") 
       ]);
       setNgos(ngosRes.data);
       setMyProfile(profileRes.data);

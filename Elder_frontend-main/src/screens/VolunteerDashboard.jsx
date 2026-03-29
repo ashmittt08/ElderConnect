@@ -9,13 +9,15 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 import { useFocusEffect } from "@react-navigation/native";
 import useResponsive from "../hooks/useResponsive";
+import VolunteerSidebar, { VolunteerMobileBottomBar } from "../components/VolunteerSidebar";
 
 const colors = {
   bg: "#0F172A",
@@ -36,67 +38,89 @@ export default function VolunteerDashboard({ navigation }) {
   const [deliveries, setDeliveries] = useState([]);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [nearestNGOs, setNearestNGOs] = useState([]);
   const responsive = useResponsive();
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async (isRefresh = false) => {
+    try {
+      if (!isRefresh) setLoading(true);
+      console.log("BASE URL:", api.defaults.baseURL);
+
+      const fetchOne = async (url) => {
         try {
-          const token = await auth.currentUser.getIdToken();
-          const headers = { Authorization: `Bearer ${token}` };
-
-          const [availableRes, tasksRes, deliveriesRes, activeRes, historyRes] = await Promise.all([
-            axios.get("http://localhost:5000/volunteer/requests", { headers }),
-            axios.get("http://localhost:5000/volunteer/tasks", { headers }),
-            axios.get("http://localhost:5000/delivery/available", { headers }),
-            axios.get("http://localhost:5000/delivery/active", { headers }),
-            axios.get("http://localhost:5000/delivery/history", { headers }),
-          ]);
-
-          if (isActive) {
-            setAvailable(availableRes.data);
-            setDeliveries(deliveriesRes.data);
-            setActiveDelivery(activeRes.data);
-
-            const completedRegular = tasksRes.data
-              .filter((t) => t.status?.toLowerCase() === "completed")
-              .map((t) => ({ ...t, displayType: t.type }));
-
-            const completedDeliveries = historyRes.data
-              .map((d) => ({
-                _id: d._id,
-                displayType: d.category === "medicine" ? "Medicine Delivery" : "Grocery Delivery",
-                description: `Delivered to ${d.elder?.name || "Elder"} at ${d.deliveryAddress}`,
-                status: d.status,
-                updatedAt: d.updatedAt,
-              }));
-
-            const completedTasks = [...completedRegular, ...completedDeliveries]
-              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-            setCompleted(completedTasks);
-          }
+          const res = await api.get(url);
+          return res.data;
         } catch (err) {
-          console.log("DASHBOARD ERROR:", err.response?.data || err);
-        } finally {
-          if (isActive) setLoading(false);
+          const status = err.response?.status;
+          const msg = err.response?.data?.message || err.message;
+          console.warn(`FETCH ERROR [${url}]: Status ${status} - ${msg}`);
+          return null;
         }
       };
 
+      const [availableData, tasksData, deliveriesData, activeData, historyData, ngosData] = await Promise.all([
+        fetchOne("/volunteer/requests"),
+        fetchOne("/volunteer/tasks"),
+        fetchOne("/delivery/available"),
+        fetchOne("/delivery/active"),
+        fetchOne("/delivery/history"),
+        fetchOne("/volunteer/ngos")
+      ]);
+
+      if (availableData) setAvailable(availableData);
+      if (deliveriesData) setDeliveries(deliveriesData);
+      if (activeData) setActiveDelivery(activeData);
+      if (ngosData) setNearestNGOs(ngosData);
+
+      console.log("DASHBOARD DATA LOADED:", {
+        available: availableData?.length,
+        deliveries: deliveriesData?.length,
+        active: !!activeData
+      });
+
+      const completedRegular = (tasksData || [])
+        .filter((t) => t.status?.toLowerCase() === "completed")
+        .map((t) => ({ ...t, displayType: t.type }));
+
+      const completedDeliveries = (historyData || [])
+        .map((d) => ({
+          _id: d._id,
+          displayType: d.category === "medicine" ? "Medicine Delivery" : "Grocery Delivery",
+          description: `Delivered to ${d.elder?.name || "Elder"} at ${d.deliveryAddress}`,
+          status: d.status,
+          updatedAt: d.updatedAt,
+        }));
+
+      const completedTasks = [...completedRegular, ...completedDeliveries]
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      setCompleted(completedTasks);
+
+    } catch (err) {
+      console.log("DASHBOARD ERROR:", err.response?.data || err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
       fetchDashboard();
-      return () => {
-        isActive = false;
-      };
-    }, [])
+    }, [fetchDashboard])
   );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboard(true);
+  };
 
   const acceptDelivery = async (deliveryId) => {
     try {
       const token = await auth.currentUser.getIdToken();
-      await axios.post(
-        `http://localhost:5000/delivery/accept/${deliveryId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        `/delivery/accept/${deliveryId}`,
+        {}
       );
       navigation.navigate("VolunteerActiveDelivery", { orderId: deliveryId });
     } catch (err) {
@@ -110,63 +134,19 @@ export default function VolunteerDashboard({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
         {/* Sidebar */}
-        {responsive.showSidebar && (
-          <View style={styles.sidebar}>
-            <View style={styles.profileSection}>
-              <View style={styles.avatar}>
-                {user?.profilePhoto ? (
-                  <Image 
-                    source={{ uri: user.profilePhoto }} 
-                    style={{ width: "100%", height: "100%", borderRadius: 30 }} 
-                  />
-                ) : (
-                  <Text style={styles.avatarText}>
-                    {user?.name?.charAt(0)?.toUpperCase()}
-                  </Text>
-                )}
-              </View>
-
-              <Text style={styles.profileName}>
-                {user?.name || "Volunteer"}
-              </Text>
-
-              <Text style={styles.profileRole}>
-                {user?.role?.toUpperCase() || "VOLUNTEER"}
-              </Text>
-            </View>
-
-            <SidebarItem label="Dashboard" active />
-            <SidebarItem
-              label="Requests"
-              onPress={() => navigation.navigate("AvailableRequests")}
-            />
-            <SidebarItem
-              label="My Tasks"
-              onPress={() => navigation.navigate("MyTasks")}
-            />
-            <SidebarItem
-              label="Partner NGOs"
-              onPress={() => navigation.navigate("NGOsScreen")}
-            />
-            <SidebarItem
-              label="Events"
-              onPress={() => navigation.navigate("EventsScreen")}
-            />
-            {activeDelivery && (
-              <SidebarItem
-                label="🚚 Active Delivery"
-                onPress={() =>
-                  navigation.navigate("VolunteerActiveDelivery", {
-                    orderId: activeDelivery._id,
-                  })
-                }
-              />
-            )}
-          </View>
-        )}
+        <VolunteerSidebar 
+          navigation={navigation} 
+          activeKey="VolunteerDashboard" 
+          activeDelivery={activeDelivery} 
+        />
 
         {/* Main Content */}
-        <ScrollView style={styles.content}>
+        <ScrollView 
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <Text style={styles.heading}>Dashboard</Text>
           <Text style={styles.subheading}>
             Manage your activities and performance
@@ -195,6 +175,41 @@ export default function VolunteerDashboard({ navigation }) {
                   value={deliveries.length}
                   color="#F59E0B"
                 />
+              </View>
+
+              {/* Nearby NGOs Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Nearby Partner NGOs 🏢</Text>
+              </View>
+              <View style={styles.ngoList}>
+                {nearestNGOs.length > 0 ? (
+                  nearestNGOs.map((ngo) => (
+                    <TouchableOpacity 
+                      key={ngo._id} 
+                      style={styles.ngoCard}
+                      onPress={() => navigation.navigate("NGOsScreen")}
+                    >
+                      <View style={styles.ngoAvatar}>
+                        {ngo.profilePhoto ? (
+                          <Image source={{ uri: ngo.profilePhoto }} style={styles.ngoImage} />
+                        ) : (
+                          <Text style={styles.ngoAvatarText}>{ngo.name?.charAt(0)?.toUpperCase()}</Text>
+                        )}
+                      </View>
+                      <View style={styles.ngoInfo}>
+                        <Text style={styles.ngoName}>{ngo.name}</Text>
+                        <Text style={styles.ngoAddress}>📍 {ngo.address || "Address not provided"}</Text>
+                      </View>
+                      <View style={styles.joinBadge}>
+                        <Text style={styles.joinBadgeText}>View</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>No NGOs found in your city yet.</Text>
+                  </View>
+                )}
               </View>
 
               {/* Active Delivery Banner */}
@@ -301,6 +316,11 @@ export default function VolunteerDashboard({ navigation }) {
           )}
         </ScrollView>
       </View>
+      <VolunteerMobileBottomBar 
+        navigation={navigation} 
+        activeKey="VolunteerDashboard" 
+        activeDelivery={activeDelivery} 
+      />
     </SafeAreaView>
   );
 }
@@ -513,4 +533,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   acceptDeliveryText: { color: "#FFF", fontWeight: "600", fontSize: 14 },
+  
+  ngoList: { gap: 12, marginBottom: 20 },
+  ngoCard: {
+    flexDirection: "row",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    alignItems: "center",
+  },
+  ngoAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.primary + "25",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+    overflow: "hidden",
+  },
+  ngoImage: { width: "100%", height: "100%" },
+  ngoAvatarText: { color: colors.primary, fontSize: 20, fontWeight: "bold" },
+  ngoInfo: { flex: 1, gap: 4 },
+  ngoName: { color: colors.text, fontSize: 16, fontWeight: "700" },
+  ngoAddress: { color: colors.muted, fontSize: 13 },
+  joinBadge: {
+    backgroundColor: colors.primary + "15",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  joinBadgeText: { color: colors.primary, fontSize: 12, fontWeight: "600" },
+  emptyCard: {
+    padding: 20,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyText: { color: colors.muted },
 });

@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 
 const colors = {
@@ -30,9 +30,8 @@ export default function MyRequests() {
       try {
         const token = await auth.currentUser.getIdToken();
 
-        const res = await axios.get(
-          "http://localhost:5000/elder/requests",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          "/elder/requests"
         );
 
         setRequests(res.data);

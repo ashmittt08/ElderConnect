@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 
 export default function NGOStats() {
@@ -19,9 +19,8 @@ export default function NGOStats() {
       try {
         const token = await auth.currentUser.getIdToken();
 
-        const res = await axios.get(
-          "http://localhost:5000/ngo/stats",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await api.get(
+          "/ngo/stats"
         );
 
         setStats(res.data);

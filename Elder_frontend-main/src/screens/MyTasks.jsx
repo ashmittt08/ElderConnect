@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -35,12 +35,8 @@ export default function MyTasks() {
       const token = await auth.currentUser.getIdToken();
 
       const [tasksRes, historyRes] = await Promise.all([
-        axios.get("http://localhost:5000/volunteer/tasks", {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get("http://localhost:5000/delivery/history", {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        api.get("/volunteer/tasks"),
+        api.get("/delivery/history")
       ]);
 
       const regularTasks = tasksRes.data.map(t => ({ ...t, displayType: t.type }));
@@ -75,10 +71,9 @@ export default function MyTasks() {
       setProcessingId(id);
       const token = await auth.currentUser.getIdToken();
 
-      await axios.post(
-        `http://localhost:5000/volunteer/complete/${id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        `/volunteer/complete/${id}`,
+        {}
       );
 
       Alert.alert("Success", "Task marked as completed");

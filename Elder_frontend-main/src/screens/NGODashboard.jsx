@@ -12,9 +12,10 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
 import useResponsive from "../hooks/useResponsive";
+import NGOSidebar, { NGOMobileBottomBar } from "../components/NGOSidebar";
 
 const colors = {
   bg: "#0F172A",
@@ -42,8 +43,8 @@ export default function NGODashboard({ navigation }) {
         try {
           const token = await auth.currentUser.getIdToken();
 
-          const statsRes = await axios.get(
-            "http://localhost:5000/ngo/stats",
+          const statsRes = await api.get(
+            "/ngo/stats",
             { headers: { Authorization: `Bearer ${token}` } }
           );
 
@@ -52,8 +53,8 @@ export default function NGODashboard({ navigation }) {
           setCompletedCount(statsRes.data.completedTasks);
 
 
-          const completedRes = await axios.get(
-            "http://localhost:5000/ngo/completed",
+          const completedRes = await api.get(
+            "/ngo/completed",
             { headers: { Authorization: `Bearer ${token}` } },
           );
 
@@ -81,47 +82,7 @@ export default function NGODashboard({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.layout, { flexDirection: responsive.showSidebar ? "row" : "column" }]}>
-        {responsive.showSidebar && (
-          <View style={styles.sidebar}>
-            <View style={styles.sidebarHeader}>
-              <Text style={styles.logo}>ElderConnect</Text>
-              <Text style={styles.hub}>NGO Hub</Text>
-            </View>
-
-            <View style={styles.profileSection}>
-              <View style={styles.avatar}>
-                {user?.profilePhoto ? (
-                  <Image 
-                    source={{ uri: user.profilePhoto }} 
-                    style={{ width: "100%", height: "100%", borderRadius: 25 }} 
-                  />
-                ) : (
-                  <Text style={styles.avatarText}>
-                    {user?.name?.charAt(0)?.toUpperCase()}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName} numberOfLines={1}>{user?.name || "NGO"}</Text>
-                <Text style={styles.profileRole}>NGO</Text>
-              </View>
-            </View>
-
-            <SidebarItem label="Dashboard" active />
-            <SidebarItem
-              label="Volunteers"
-              onPress={() => navigation.navigate("NGOVolunteers")}
-            />
-            <SidebarItem
-              label="Available Requests"
-              onPress={() => navigation.navigate("NGORequests")}
-            />
-            <SidebarItem
-              label="Events"
-              onPress={() => navigation.navigate("EventsScreen")}
-            />
-          </View>
-        )}
+        <NGOSidebar navigation={navigation} activeKey="NGODashboard" />
 
         <ScrollView style={styles.content}>
           <Text style={styles.heading}>Dashboard</Text>
@@ -166,6 +127,7 @@ export default function NGODashboard({ navigation }) {
           />
         </ScrollView>
       </View>
+      <NGOMobileBottomBar navigation={navigation} activeKey="NGODashboard" />
     </SafeAreaView>
   );
 }

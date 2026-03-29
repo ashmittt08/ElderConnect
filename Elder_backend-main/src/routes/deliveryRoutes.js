@@ -96,6 +96,10 @@ router.get(
   requireRole("volunteer"),
   async (req, res) => {
     try {
+      if (!req.user.approved) {
+        return res.status(403).json({ message: "Account verification pending. You cannot accept deliveries yet." });
+      }
+
       const orders = await DeliveryOrder.find({ status: "pending" })
         .populate("elder", "name address")
         .sort({ createdAt: -1 });
@@ -115,6 +119,9 @@ router.post(
   requireRole("volunteer"),
   async (req, res) => {
     try {
+      if (!req.user.approved) {
+        return res.status(403).json({ message: "Account verification pending. You cannot accept deliveries yet." });
+      }
       const order = await DeliveryOrder.findById(req.params.id);
 
       if (!order || order.status !== "pending") {

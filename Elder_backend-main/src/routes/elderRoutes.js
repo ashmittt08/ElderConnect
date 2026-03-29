@@ -85,14 +85,21 @@ router.get(
       );
 
       const elderAddress = (elder.address || "").toLowerCase();
-      
+      const addrParts = elderAddress.split(',').map(p => p.trim());
+      const elderCity = addrParts.length >= 2 ? addrParts[addrParts.length - 2] : null;
+
       // Simple pseudo-matching: prioritize NGOs with overlapping address words
-      const elderWords = elderAddress.split(/\s+/).filter(w => w.length > 3);
+      const elderWords = elderAddress.split(/[,\s]+/).filter(w => w.length > 3);
 
       const scoredNgos = ngos.map((ngo) => {
         let score = 0;
         const ngoAddress = (ngo.address || "").toLowerCase();
         
+        // Boost score if city matches
+        if (elderCity && ngoAddress.includes(elderCity)) {
+          score += 10;
+        }
+
         elderWords.forEach(word => {
           if (ngoAddress.includes(word)) score += 1;
         });
@@ -170,7 +177,21 @@ router.get(
   requireRole("elder"),
   async (req, res) => {
     try {
-      const ngos = await User.find({ role: "ngo", approved: true }).select(
+      const user = req.user;
+      let query = { role: "ngo", approved: true };
+
+      // If user has address, try to filter by city (assuming locality, city, state format)
+      if (user.address) {
+        const parts = user.address.split(',').map(p => p.trim());
+        if (parts.length >= 2) {
+          const city = parts[parts.length - 2];
+          if (city) {
+            query.address = { $regex: city, $options: 'i' };
+          }
+        }
+      }
+
+      const ngos = await User.find(query).select(
         "name address phone profilePhoto email"
       );
       res.status(200).json(ngos);

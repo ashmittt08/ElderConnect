@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../api";
+import { AuthContext } from "../context/AuthContext";
 import ElderSidebar, { ElderMobileBottomBar } from "../components/ElderSidebar";
 import useResponsive from "../hooks/useResponsive";
 
@@ -32,13 +33,14 @@ const colors = {
   urgentBg: "#EF444420",
   urgentBorder: "#EF4444",
 };
-
 export default function DeliveryOrderScreen({ navigation }) {
   const responsive = useResponsive();
+  const { user } = React.useContext(AuthContext);
 
   const [category, setCategory] = useState("medicine");
   const [items, setItems] = useState([{ name: "", quantity: 1, notes: "", urgent: false }]);
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [useProfileAddress, setUseProfileAddress] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1 = form, 2 = review
@@ -56,6 +58,15 @@ export default function DeliveryOrderScreen({ navigation }) {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
     setItems(updated);
+  };
+
+  const toggleProfileAddress = (val) => {
+    setUseProfileAddress(val);
+    if (val && user?.address) {
+      setDeliveryAddress(user.address);
+    } else if (!val) {
+      setDeliveryAddress("");
+    }
   };
 
   const validate = () => {
@@ -224,12 +235,26 @@ export default function DeliveryOrderScreen({ navigation }) {
       </TouchableOpacity>
 
       {/* Delivery Address */}
-      <Text style={styles.sectionLabel}>DELIVERY ADDRESS</Text>
+      <View style={styles.addressHeader}>
+        <Text style={styles.sectionLabel}>DELIVERY ADDRESS</Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Use Profile Address</Text>
+          <Switch
+            value={useProfileAddress}
+            onValueChange={toggleProfileAddress}
+            trackColor={{ false: colors.border, true: colors.primary + "80" }}
+            thumbColor={useProfileAddress ? colors.primary : colors.muted}
+          />
+        </View>
+      </View>
       <TextInput
         placeholder="Enter your delivery address..."
         placeholderTextColor={colors.muted}
         value={deliveryAddress}
-        onChangeText={setDeliveryAddress}
+        onChangeText={(v) => {
+          setDeliveryAddress(v);
+          if (v !== user?.address) setUseProfileAddress(false);
+        }}
         style={[styles.input, styles.addressInput]}
         multiline
       />
@@ -428,7 +453,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 10,
     marginTop: 20,
+    flex: 1,
   },
+  addressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  toggleLabel: { fontSize: 13, color: colors.muted },
 
   // Category
   categoryRow: { flexDirection: "row", gap: 12 },

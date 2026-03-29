@@ -40,14 +40,23 @@ export default function ElderDashboard({ navigation }) {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const [reqsRes, ngosRes] = await Promise.all([
-        api.get("/elder/requests"),
-        api.get("/elder/nearest-ngos"),
-      ]);
+      setLoading(true);
+      
+      // Isolated calls for better debugging on Android Emulator
+      const reqsRes = await api.get("/elder/requests");
       setRequests(reqsRes.data);
-      setNearestNGOs(ngosRes.data);
+
+      try {
+        const ngosRes = await api.get("/elder/nearest-ngos");
+        setNearestNGOs(ngosRes.data);
+      } catch (ngoErr) {
+        console.warn("NEAREST NGOS ERROR:", ngoErr.message);
+        // Fallback to empty if nearest NGOs fails
+        setNearestNGOs([]);
+      }
+
     } catch (err) {
-      console.error("ELDER DASHBOARD ERROR:", err.response?.data || err);
+      console.error("ELDER DASHBOARD ERROR (Requests):", err.message || err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -241,11 +250,10 @@ export default function ElderDashboard({ navigation }) {
           </View>
 
           {/* Bottom padding */}
-          <View style={{ height: responsive.showBottomBar ? 80 : 40 }} />
+          <View style={{ height: responsive.showBottomBar ? 100 : 40 }} />
         </ScrollView>
-
-        <ElderMobileBottomBar navigation={navigation} activeKey="ElderDashboard" />
       </View>
+      <ElderMobileBottomBar navigation={navigation} activeKey="ElderDashboard" />
     </SafeAreaView>
   );
 }

@@ -1,7 +1,7 @@
 import { createContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../config/firebase";
-import axios from "axios";
+import api from "../api";
 
 export const AuthContext = createContext();
 
@@ -39,8 +39,8 @@ export function AuthProvider({ children }) {
 
         const token = await firebaseUser.getIdToken();
 
-        const res = await axios.get(
-          "http://localhost:5000/auth/me",
+        const res = await api.get(
+          "/auth/me",
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -57,7 +57,11 @@ export function AuthProvider({ children }) {
 
       } catch (err) {
 
-        console.log("AUTH ERROR:", err.message);
+        console.log("AUTH ERROR:", err.response?.status === 404 ? "User missing from DB" : err.message);
+        if (err.response?.status === 404) {
+          await auth.signOut();
+          setUser(null);
+        }
 
       } finally {
 

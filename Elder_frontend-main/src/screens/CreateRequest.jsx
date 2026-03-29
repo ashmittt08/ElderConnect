@@ -11,8 +11,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import axios from "axios";
 import { auth } from "../config/firebase";
+import api from "../api";
 import { Picker } from "@react-native-picker/picker";
 
 const colors = {
@@ -42,16 +42,11 @@ export default function CreateRequest({ navigation }) {
       setLoading(true);
       const token = await auth.currentUser.getIdToken();
 
-      await axios.post(
-        "http://localhost:5000/elder/request",
+      await api.post(
+        "/elder/request",
         {
           type: type.toLowerCase(),
           description,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
         }
       );
 

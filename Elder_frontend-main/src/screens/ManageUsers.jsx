@@ -1,18 +1,13 @@
 import { View, Text, FlatList, Button } from "react-native";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { auth } from "../config/firebase";
-
-const BASE_URL = "http://localhost:5000";
 
 export default function ManageUsers() {
   const [users, setUsers] = useState([]);
 
   const fetchUsers = async () => {
-    const token = await auth.currentUser.getIdToken();
-    const res = await axios.get(`${BASE_URL}/admin/users`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await api.get("/admin/users");
     setUsers(res.data);
   };
 
@@ -21,18 +16,12 @@ export default function ManageUsers() {
   }, []);
 
   const approveNgo = async (id) => {
-    const token = await auth.currentUser.getIdToken();
-    await axios.post(`${BASE_URL}/admin/approve-ngo/${id}`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await api.post(`/admin/approve-ngo/${id}`, {});
     fetchUsers();
   };
 
   const toggleBlock = async (id) => {
-    const token = await auth.currentUser.getIdToken();
-    await axios.post(`${BASE_URL}/admin/toggle-block/${id}`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await api.post(`/admin/toggle-block/${id}`, {});
     fetchUsers();
   };
 

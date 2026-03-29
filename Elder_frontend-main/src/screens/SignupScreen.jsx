@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../config/firebase";
-import axios from "axios";
+import api from "../api";
 
 const colors = {
   bg: "#0F172A",
@@ -56,8 +56,8 @@ export default function SignupScreen({ route, navigation }) {
 
       const token = await res.user.getIdToken(true);
 
-      await axios.post(
-        "http://localhost:5000/auth/register",
+      await api.post(
+        "/auth/register",
         { token, role, name }
       );
 
@@ -67,11 +67,16 @@ export default function SignupScreen({ route, navigation }) {
         [
           {
             text: "OK",
-            onPress: () =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Login" }],
-              }),
+            onPress: () => {
+              if (Platform.OS === "web") {
+                window.location.reload();
+              } else {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                });
+              }
+            },
           },
         ]
       );
@@ -130,7 +135,10 @@ export default function SignupScreen({ route, navigation }) {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
-              style={styles.input}
+              style={[
+                styles.input,
+                password && confirmPassword ? { borderColor: password === confirmPassword ? "#22C55E" : "#EF4444" } : null
+              ]}
               placeholderTextColor={colors.muted}
             />
 
@@ -139,7 +147,10 @@ export default function SignupScreen({ route, navigation }) {
               secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              style={styles.input}
+              style={[
+                styles.input,
+                password && confirmPassword ? { borderColor: password === confirmPassword ? "#22C55E" : "#EF4444" } : null
+              ]}
               placeholderTextColor={colors.muted}
             />
           </View>
