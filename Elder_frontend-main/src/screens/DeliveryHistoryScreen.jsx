@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../api";
@@ -63,6 +65,42 @@ export default function DeliveryHistoryScreen({ navigation }) {
       setRefreshing(false);
     }
   }, []);
+
+  const handleDeleteOrder = (orderId) => {
+    const title = "Delete Order";
+    const message = "Are you sure you want to remove this order from your history? This action cannot be undone.";
+
+    if (Platform.OS === 'web') {
+      const confirm = window.confirm(`${title}\n\n${message}`);
+      if (confirm) {
+        performDelete(orderId);
+      }
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", style: "destructive", onPress: () => performDelete(orderId) }
+        ]
+      );
+    }
+  };
+
+  const performDelete = async (orderId) => {
+    try {
+      await api.delete(`/delivery/order/${orderId}`);
+      setOrders(prev => prev.filter(o => o._id !== orderId));
+    } catch (err) {
+      console.error("DELETE ORDER ERROR:", err);
+      const errorMsg = err.response?.data?.message || "Failed to delete order";
+      if (Platform.OS === 'web') {
+        window.alert(errorMsg);
+      } else {
+        Alert.alert("Error", errorMsg);
+      }
+    }
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -172,6 +210,7 @@ export default function DeliveryHistoryScreen({ navigation }) {
                   onPress={() =>
                     navigation.navigate("DeliveryTrackingScreen", { orderId: order._id })
                   }
+                  onDelete={() => handleDeleteOrder(order._id)}
                 />
               ))}
             </>
@@ -218,62 +257,76 @@ const StatCard = ({ title, value, color }) => (
   </View>
 );
 
-const OrderCard = ({ order, onPress, isActive }) => {
+const OrderCard = ({ order, onPress, onDelete, isActive }) => {
   const statusColor = statusColors[order.status] || colors.muted;
   const itemCount = order.items?.length || 0;
   const urgentCount = order.items?.filter((i) => i.urgent).length || 0;
 
   return (
-    <TouchableOpacity
-      style={[styles.orderCard, isActive && styles.orderCardActive]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.orderCardHeader}>
-        <View style={styles.orderCategoryBadge}>
-          <Text style={styles.orderCategoryIcon}>
-            {order.category === "medicine" ? "💊" : "🛒"}
-          </Text>
-          <Text style={styles.orderCategoryText}>
-            {order.category?.charAt(0).toUpperCase() + order.category?.slice(1)}
-          </Text>
+    <View style={[styles.orderCard, isActive && styles.orderCardActive]}>
+      {/* Main Touchable part of the card */}
+      <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.7}
+        style={styles.orderCardClickable}
+      >
+        <View style={styles.orderCardHeader}>
+          <View style={styles.orderCategoryBadge}>
+            <Text style={styles.orderCategoryIcon}>
+              {order.category === "medicine" ? "💊" : "🛒"}
+            </Text>
+            <Text style={styles.orderCategoryText}>
+              {order.category?.charAt(0).toUpperCase() + order.category?.slice(1)}
+            </Text>
+          </View>
+          <View style={[styles.statusPill, { backgroundColor: statusColor + "20" }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {statusLabels[order.status] || order.status}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statusPill, { backgroundColor: statusColor + "20" }]}>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {statusLabels[order.status] || order.status}
-          </Text>
-        </View>
-      </View>
 
-      <Text style={styles.orderAddress} numberOfLines={1}>
-        📍 {order.deliveryAddress}
-      </Text>
-
-      <View style={styles.orderMeta}>
-        <Text style={styles.orderMetaText}>
-          {itemCount} item{itemCount !== 1 ? "s" : ""}
-          {urgentCount > 0 ? ` · ${urgentCount} urgent` : ""}
+        <Text style={styles.orderAddress} numberOfLines={1}>
+          📍 {order.deliveryAddress}
         </Text>
-        <Text style={styles.orderDate}>
-          {new Date(order.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
 
-      {order.volunteer && (
-        <View style={styles.orderVolunteer}>
-          <Text style={styles.orderVolunteerText}>
-            🙋 {order.volunteer.name || "Volunteer assigned"}
+        <View style={styles.orderMeta}>
+          <Text style={styles.orderMetaText}>
+            {itemCount} item{itemCount !== 1 ? "s" : ""}
+            {urgentCount > 0 ? ` · ${urgentCount} urgent` : ""}
+          </Text>
+          <Text style={styles.orderDate}>
+            {new Date(order.createdAt).toLocaleDateString()}
           </Text>
         </View>
-      )}
 
-      {isActive && (
-        <View style={styles.trackBtn}>
-          <Text style={styles.trackBtnText}>Track Delivery →</Text>
-        </View>
+        {order.volunteer && (
+          <View style={styles.orderVolunteer}>
+            <Text style={styles.orderVolunteerText}>
+              🙋 {order.volunteer.name || "Volunteer assigned"}
+            </Text>
+          </View>
+        )}
+
+        {isActive && (
+          <View style={styles.trackBtn}>
+            <Text style={styles.trackBtnText}>Track Delivery →</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Independent Delete Button */}
+      {onDelete && (
+        <TouchableOpacity 
+          style={styles.absDeleteBtn}
+          onPress={onDelete}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        >
+          <Text style={styles.smallDeleteBtnText}>✕</Text>
+        </TouchableOpacity>
       )}
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -347,15 +400,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 18,
     marginBottom: 12,
+    position: "relative", // Ensure relative for absolute child
   },
   orderCardActive: { borderColor: colors.primary + "50" },
+  orderCardClickable: {
+    padding: 18,
+  },
   orderCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
+    paddingRight: 30, // Make room for absolute X button
   },
   orderCategoryBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
   orderCategoryIcon: { fontSize: 16 },
@@ -370,6 +427,23 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 12, fontWeight: "600" },
+  absDeleteBtn: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.danger + "20",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10, // Ensure it's on top
+  },
+  smallDeleteBtnText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "800",
+  },
   orderAddress: { fontSize: 13, color: colors.muted, marginBottom: 10 },
   orderMeta: {
     flexDirection: "row",

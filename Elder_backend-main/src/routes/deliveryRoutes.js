@@ -331,4 +331,37 @@ router.put(
   }
 );
 
+// ── Elder: Hard delete an order from history ──
+router.delete(
+  "/order/:id",
+  verifyUser,
+  requireRole("elder"),
+  async (req, res) => {
+    try {
+      const order = await DeliveryOrder.findOne({
+        _id: req.params.id,
+        elder: req.user._id,
+      });
+
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Protection: Don't delete active orders that someone is currently delivering
+      const activeStatuses = ["accepted", "picked_up", "out_for_delivery"];
+      if (activeStatuses.includes(order.status)) {
+        return res.status(400).json({ 
+          message: "Cannot delete an active delivery. Please wait for completion or cancel if still pending." 
+        });
+      }
+
+      await DeliveryOrder.deleteOne({ _id: req.params.id });
+      res.json({ message: "Order deleted successfully" });
+    } catch (err) {
+      console.error("❌ DELETE ORDER ERROR:", err);
+      res.status(500).json({ message: "Failed to delete order" });
+    }
+  }
+);
+
 export default router;
