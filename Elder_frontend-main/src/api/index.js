@@ -1,9 +1,6 @@
-import { Platform } from "react-native";
 import axios from "axios";
 import { auth } from "../config/firebase";
-import { HOST_IP, PORT } from "../config/network";
-
-const BASE_URL = Platform.OS === "android" ? `http://${HOST_IP}:${PORT}` : `http://localhost:${PORT}`;
+import { BASE_URL } from "../config/network";
 
 const api = axios.create({
   baseURL: BASE_URL
