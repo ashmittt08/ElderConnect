@@ -127,4 +127,45 @@ router.get(
 
 
 
+// GET NGO MEMBERS (Volunteers & Elders)
+// Accessible by Volunteers and Elders who HAVE JOINED
+router.get(
+  "/details/:id/members",
+  verifyUser,
+  async (req, res) => {
+    try {
+      const ngoId = req.params.id;
+      const user = req.user;
+
+      // Security Check: Is the user a member of this NGO?
+      const isMember = 
+        (user.role === "elder" && user.joinedNGO?.toString() === ngoId) ||
+        (user.role === "volunteer" && user.joinedNGOs?.some(id => id.toString() === ngoId)) ||
+        (user.role === "admin") || // Admins can see all
+        (user.role === "ngo" && user._id.toString() === ngoId); // The NGO itself
+
+      if (!isMember) {
+        return res.status(403).json({ 
+          message: "Access Denied: You must be a member of this NGO to view its directory." 
+        });
+      }
+
+      const volunteers = await User.find({
+        role: "volunteer",
+        joinedNGOs: ngoId,
+      }).select("name email profilePhoto phone");
+
+      const elders = await User.find({
+        role: "elder",
+        joinedNGO: ngoId,
+      }).select("name email profilePhoto phone");
+
+      res.json({ volunteers, elders });
+    } catch (err) {
+      console.error("❌ FETCH NGO MEMBERS ERROR:", err);
+      res.status(500).json({ message: "Failed to fetch NGO members" });
+    }
+  }
+);
+
 export default router;

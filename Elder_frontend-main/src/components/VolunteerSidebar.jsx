@@ -18,6 +18,7 @@ const navItems = [
   { key: "AvailableRequests", label: "Find Work", shortLabel: "Find", icon: "🔍" },
   { key: "MyTasks", label: "My Tasks", shortLabel: "Tasks", icon: "✅" },
   { key: "NGOsScreen", label: "Partner NGOs", shortLabel: "NGOs", icon: "🤝" },
+  { key: "MyNGOsScreen", label: "My NGOs", shortLabel: "My NGOs", icon: "🏢" },
   { key: "EventsScreen", label: "Events", shortLabel: "Events", icon: "📅" },
 ];
 
@@ -99,7 +100,8 @@ export function VolunteerMobileBottomBar({ navigation, activeKey, activeDelivery
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.bottomBarContent}
       >
-        {navItems.map((item) => {
+        {/* Render first 3 nav items */}
+        {navItems.slice(0, 3).map((item) => {
           const isActive = activeKey === item.key;
           return (
             <TouchableOpacity
@@ -116,15 +118,36 @@ export function VolunteerMobileBottomBar({ navigation, activeKey, activeDelivery
             </TouchableOpacity>
           );
         })}
+
+        {/* Insert Active Delivery in the middle (3rd/4th position) */}
         {activeDelivery && (
           <TouchableOpacity
             onPress={() => navigation.navigate("VolunteerActiveDelivery", { orderId: activeDelivery._id })}
-            style={[styles.bottomTab, { backgroundColor: '#F97316' }]}
+            style={[styles.bottomTab, { backgroundColor: '#F97316', borderRadius: 12, marginVertical: 2, paddingHorizontal: 15 }]}
           >
             <Text style={styles.bottomTabIcon}>🚚</Text>
             <Text style={[styles.bottomTabLabel, { color: '#FFF' }]}>Order</Text>
           </TouchableOpacity>
         )}
+
+        {/* Render remaining nav items */}
+        {navItems.slice(3).map((item) => {
+          const isActive = activeKey === item.key;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              onPress={() => navigateTo(navigation, item.key, activeKey)}
+              style={[styles.bottomTab, isActive && styles.bottomTabActive]}
+            >
+              <Text style={[styles.bottomTabIcon, isActive && styles.bottomTabIconActive]}>
+                {item.icon}
+              </Text>
+              <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
+                {item.shortLabel}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );

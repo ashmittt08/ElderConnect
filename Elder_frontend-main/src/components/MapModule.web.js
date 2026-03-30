@@ -35,14 +35,44 @@ const mapHtml = `
 <body>
   <div id="map"></div>
   <script>
-    const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([23.0772, 76.8513], 15);
+    const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([23.2599, 77.4126], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let volMarker, destMarker, routeLine;
     const volIcon = L.divIcon({ className: 'custom-div-icon', html: '🛵', iconSize: [36, 36], iconAnchor: [18, 18] });
     const destIcon = L.divIcon({ className: 'custom-div-icon', html: '📍', iconSize: [36, 36], iconAnchor: [18, 36] });
 
-    window.addEventListener('message', (event) => {
+    async function fetchOSRMRoute(start, end) {
+      try {
+        const url = \`https://router.project-osrm.org/route/v1/driving/\${start[1]},\${start[0]};\${end[1]},\${end[0]}?overview=full&geometries=polyline\`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.routes && data.routes.length > 0) {
+          return data.routes[0].geometry;
+        }
+      } catch (err) {
+        console.error("OSRM Fetch Error:", err);
+      }
+      return null;
+    }
+
+    // Polyline decoding helper for Leaflet
+    function decode(str, precision) {
+      var index = 0, lat = 0, lng = 0, coordinates = [], shift = 0, result = 0, byte = null, latitude_change, longitude_change, factor = Math.pow(10, precision || 5);
+      while (index < str.length) {
+        byte = null; shift = 0; result = 0;
+        do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+        latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1)); lat += latitude_change;
+        shift = 0; result = 0;
+        do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+        longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1)); lng += longitude_change;
+        coordinates.push([lat / factor, lng / factor]);
+      }
+      return coordinates;
+    };
+
+    window.addEventListener('message', async (event) => {
       const data = event.data;
       if (data.type === 'UPDATE_MAP') {
         const { volunteer, destination } = data;
@@ -51,7 +81,6 @@ const mapHtml = `
           if (!volMarker) {
             volMarker = L.marker([volunteer.latitude, volunteer.longitude], { icon: volIcon, zIndexOffset: 1000 }).addTo(map);
           } else {
-            // Smoothly move the marker if we wanted to (CSS transitions could be added), but setting LatLng works
             volMarker.setLatLng([volunteer.latitude, volunteer.longitude]);
           }
         }
@@ -65,21 +94,28 @@ const mapHtml = `
         }
         
         if (volunteer && destination) {
+          const encoded = await fetchOSRMRoute([volunteer.latitude, volunteer.longitude], [destination.latitude, destination.longitude]);
+          
           if (routeLine) map.removeLayer(routeLine);
           
-          routeLine = L.polyline([
-            [volunteer.latitude, volunteer.longitude],
-            [destination.latitude, destination.longitude]
-          ], { color: '#60B246', weight: 4, dashArray: '8, 8' }).addTo(map);
+          if (encoded) {
+            const points = decode(encoded);
+            routeLine = L.polyline(points, { color: '#60B246', weight: 5, lineJoin: 'round' }).addTo(map);
+          } else {
+            // Fallback to straight line
+            routeLine = L.polyline([
+              [volunteer.latitude, volunteer.longitude],
+              [destination.latitude, destination.longitude]
+            ], { color: '#60B246', weight: 4, dashArray: '8, 8' }).addTo(map);
+          }
           
-          map.fitBounds(L.latLngBounds([volunteer.latitude, volunteer.longitude], [destination.latitude, destination.longitude]), { padding: [40, 40] });
+          map.fitBounds(L.latLngBounds([volunteer.latitude, volunteer.longitude], [destination.latitude, destination.longitude]), { padding: [50, 50] });
         } else if (volunteer) {
           map.panTo([volunteer.latitude, volunteer.longitude]);
         }
       }
     });
 
-    // Notify ready
     window.parent.postMessage({ type: 'MAP_READY' }, '*');
   </script>
 </body>
@@ -113,7 +149,7 @@ export const MapView = ({ volunteer, destination, style }) => {
     <iframe
       ref={iframeRef}
       title="Live Delivery Tracking Map"
-      style={{ border: 'none', width: '100%', height: '100%', ...(style || {}) }}
+      style={{ border: 'none', width: '100%', height: '100%', borderRadius: '12px', ...(style || {}) }}
       srcDoc={mapHtml}
       onLoad={updateMap}
     />
@@ -121,6 +157,5 @@ export const MapView = ({ volunteer, destination, style }) => {
 };
 
 export const Marker = ({ coordinate, title }) => {
-  // Polyfill for native Marker if accidentally used inside MapView tags.
   return null;
 };

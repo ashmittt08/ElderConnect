@@ -12,6 +12,7 @@ import {
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import api from "../api";
 import ElderSidebar, { ElderMobileBottomBar } from "../components/ElderSidebar";
 import useResponsive from "../hooks/useResponsive";
@@ -56,10 +57,8 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [volunteerLocation, setVolunteerLocation] = useState(null);
+  const [destination, setDestination] = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // Mock destination coordinate for VIT Bhopal area to show the route line
-  const mockDestination = { latitude: 23.0760, longitude: 76.8520 };
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -88,6 +87,24 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
         if (res.data.volunteerLocation?.coordinates) {
           const [lng, lat] = res.data.volunteerLocation.coordinates;
           if (lat && lng) setVolunteerLocation({ latitude: lat, longitude: lng });
+        }
+        
+        // Geocode the destination address
+        if (res.data.deliveryAddress) {
+          try {
+            const geocoded = await Location.geocodeAsync(res.data.deliveryAddress);
+            if (geocoded && geocoded.length > 0) {
+              setDestination({
+                latitude: geocoded[0].latitude,
+                longitude: geocoded[0].longitude,
+              });
+            } else {
+              setDestination({ latitude: 23.2599, longitude: 77.4126 });
+            }
+          } catch (e) {
+            console.warn("Geocoding failed:", e);
+            setDestination({ latitude: 23.2599, longitude: 77.4126 });
+          }
         }
       } catch (err) {
         console.error("FETCH ORDER ERROR:", err);
@@ -173,7 +190,12 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
               <MapView
                 style={styles.map}
                 volunteer={volunteerLocation}
-                destination={mockDestination}
+                destination={destination}
+                initialRegion={{
+                  ...(volunteerLocation || destination || { latitude: 23.2599, longitude: 77.4126 }),
+                  latitudeDelta: 0.05,
+                  longitudeDelta: 0.05,
+                }}
               />
             ) : (
               <View style={styles.mapPlaceholder}>

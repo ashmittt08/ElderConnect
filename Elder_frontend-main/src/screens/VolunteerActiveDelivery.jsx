@@ -55,11 +55,10 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
   const [checkedItems, setCheckedItems] = useState({});
   const [currentLocation, setCurrentLocation] = useState(null);
   
-  const locationWatcher = useRef(null);
+  const [destination, setDestination] = useState(null);
+  
   const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // Mock destination coordinate for VIT Bhopal area to show the route line
-  const mockDestination = { latitude: 23.0760, longitude: 76.8520 };
+  const locationWatcher = useRef(null);
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -87,6 +86,25 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
         if (!orderId) return;
         const res = await api.get(`/delivery/order/${orderId}`);
         setOrder(res.data);
+        
+        // Geocode the destination address
+        if (res.data.deliveryAddress) {
+          try {
+            const geocoded = await Location.geocodeAsync(res.data.deliveryAddress);
+            if (geocoded && geocoded.length > 0) {
+              setDestination({
+                latitude: geocoded[0].latitude,
+                longitude: geocoded[0].longitude,
+              });
+            } else {
+              // Fallback to Bhopal center if geocoding fails
+              setDestination({ latitude: 23.2599, longitude: 77.4126 });
+            }
+          } catch (e) {
+            console.warn("Geocoding failed:", e);
+            setDestination({ latitude: 23.2599, longitude: 77.4126 });
+          }
+        }
       } catch (err) {
         console.error("FETCH ACTIVE DELIVERY ERROR:", err);
       } finally {
@@ -262,25 +280,14 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
         {isActive ? (
           <MapView
             style={styles.map}
+            volunteer={currentLocation}
+            destination={destination}
             initialRegion={{
-              ...(currentLocation || mockDestination),
+              ...(currentLocation || destination || { latitude: 23.2599, longitude: 77.4126 }),
               latitudeDelta: 0.05,
               longitudeDelta: 0.05,
             }}
-          >
-            {currentLocation && (
-              <Marker
-                coordinate={currentLocation}
-                title="Your Location"
-                pinColor={colors.primary}
-              />
-            )}
-            <Marker
-              coordinate={mockDestination}
-              title="Destination"
-              pinColor={colors.accent}
-            />
-          </MapView>
+          />
         ) : (
           <View style={styles.mapPlaceholder}>
             <Text style={styles.mapPlaceholderText}>Map unavailable</Text>

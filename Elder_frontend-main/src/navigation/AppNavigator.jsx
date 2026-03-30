@@ -38,6 +38,8 @@ import DeliveryHistoryScreen from "../screens/DeliveryHistoryScreen";
 import VolunteerActiveDelivery from "../screens/VolunteerActiveDelivery";
 import NGOsScreen from "../screens/NGOsScreen";
 import EventsScreen from "../screens/EventsScreen";
+import MyNGOsScreen from "../screens/MyNGOsScreen";
+import NGODetailScreen from "../screens/NGODetailScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -91,6 +93,7 @@ export default function AppNavigator() {
             <Stack.Screen name="DeliveryHistoryScreen" component={DeliveryHistoryScreen} options={{ title: "My Deliveries" }} />
             <Stack.Screen name="CompanionScreen" component={CompanionScreen} options={{ title: "AI Companion" }} />
             <Stack.Screen name="NGOsScreen" component={NGOsScreen} options={{ title: "Partner NGOs" }} />
+            <Stack.Screen name="MyNGOsScreen" component={MyNGOsScreen} options={{ title: "My NGOs" }} />
             <Stack.Screen name="EventsScreen" component={EventsScreen} options={{ title: "Community Events" }} />
           </>
         ) : user.role === "volunteer" ? (
@@ -106,6 +109,7 @@ export default function AppNavigator() {
             <Stack.Screen name="MyTasks" component={MyTasks} />
             <Stack.Screen name="VolunteerActiveDelivery" component={VolunteerActiveDelivery} options={{ title: "Active Delivery" }} />
             <Stack.Screen name="NGOsScreen" component={NGOsScreen} options={{ title: "Partner NGOs" }} />
+            <Stack.Screen name="MyNGOsScreen" component={MyNGOsScreen} options={{ title: "My NGOs" }} />
             <Stack.Screen name="EventsScreen" component={EventsScreen} options={{ title: "Community Events" }} />
           </>
         ) : user.role === "ngo" ? (
@@ -132,6 +136,7 @@ export default function AppNavigator() {
           </>
         )}
         <Stack.Screen name="MyProfile" component={MyProfile} />
+        <Stack.Screen name="NGODetailScreen" component={NGODetailScreen} options={{ title: "NGO Details" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

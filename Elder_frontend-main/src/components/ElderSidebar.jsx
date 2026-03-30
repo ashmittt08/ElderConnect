@@ -20,6 +20,7 @@ const navItems = [
   { key: "DeliveryOrderScreen", label: "Deliveries", shortLabel: "Deliver", icon: "🚚" },
   { key: "DeliveryHistoryScreen", label: "Track Orders", shortLabel: "Track", icon: "📍" },
   { key: "NGOsScreen", label: "Partner NGOs", shortLabel: "NGOs", icon: "🤝" },
+  { key: "MyNGOsScreen", label: "My NGOs", shortLabel: "My NGOs", icon: "🏢" },
   { key: "EventsScreen", label: "Events", shortLabel: "Events", icon: "📅" },
 ];
 
@@ -96,7 +97,63 @@ export function ElderMobileBottomBar({ navigation, activeKey }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.bottomBarContent}
       >
-        {navItems.map((item) => {
+        {/* Render first 3 nav items: Home, Request, Requests */}
+        {navItems.slice(0, 3).map((item) => {
+          const isActive = activeKey === item.key;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              onPress={() => navigateTo(navigation, item.key, activeKey)}
+              style={[styles.bottomTab, isActive && styles.bottomTabActive]}
+            >
+              <Text style={[styles.bottomTabIcon, isActive && styles.bottomTabIconActive]}>
+                {item.icon}
+              </Text>
+              <Text style={[styles.bottomTabLabel, isActive && styles.bottomTabLabelActive]}>
+                {item.shortLabel}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Centerpiece: Deliver (New Order) */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("DeliveryOrderScreen")}
+          style={[
+            styles.bottomTab, 
+            { 
+              backgroundColor: '#F97316', 
+              borderRadius: 14, 
+              marginVertical: 4, 
+              paddingHorizontal: 16,
+              minWidth: 80,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 5
+            },
+            activeKey === "DeliveryOrderScreen" && { borderWidth: 2, borderColor: '#FFF' }
+          ]}
+        >
+          <Text style={[styles.bottomTabIcon, { fontSize: 24 }]}>🚚</Text>
+          <Text style={[styles.bottomTabLabel, { color: '#FFF', fontWeight: '800' }]}>Deliver</Text>
+        </TouchableOpacity>
+
+        {/* Primary Action: Track (History) */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("DeliveryHistoryScreen")}
+          style={[
+            styles.bottomTab,
+            activeKey === "DeliveryHistoryScreen" && styles.bottomTabActive
+          ]}
+        >
+          <Text style={[styles.bottomTabIcon, activeKey === "DeliveryHistoryScreen" && styles.bottomTabIconActive]}>📍</Text>
+          <Text style={[styles.bottomTabLabel, activeKey === "DeliveryHistoryScreen" && styles.bottomTabLabelActive]}>Track</Text>
+        </TouchableOpacity>
+
+        {/* Render remaining nav items: NGOs, Events */}
+        {navItems.slice(5).map((item) => {
           const isActive = activeKey === item.key;
           return (
             <TouchableOpacity

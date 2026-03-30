@@ -171,4 +171,20 @@ router.post(
   }
 );
 
+// GET MY JOINED NGOs
+router.get(
+  "/my-ngos",
+  verifyUser,
+  requireRole("volunteer"),
+  async (req, res) => {
+    try {
+      const volunteer = await User.findById(req.user._id).populate("joinedNGOs", "name address phone profilePhoto email");
+      res.json(volunteer.joinedNGOs || []);
+    } catch (err) {
+      console.error("❌ FETCH MY NGOS ERROR:", err);
+      res.status(500).json({ message: "Failed to fetch joined NGOs" });
+    }
+  }
+);
+
 export default router;

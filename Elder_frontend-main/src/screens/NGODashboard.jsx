@@ -92,20 +92,32 @@ export default function NGODashboard({ navigation }) {
 
           <Text style={styles.sectionTitle}>Key Metrics</Text>
 
-          <View style={[styles.metricsRow, { flexDirection: responsive.isMobile ? "column" : "row" }]}>
+          <View style={[
+            styles.metricsRow, 
+            { 
+              flexDirection: "row", 
+              flexWrap: "wrap", 
+              justifyContent: "center",
+              gap: 15,
+              marginBottom: 30 
+            }
+          ]}>
             <MetricCard
               title="Active Volunteers"
               value={volunteerCount}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
 
             <MetricCard
               title="Open Requests"
               value={openRequests}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
 
             <MetricCard
               title="Completed Tasks"
               value={completedCount}
+              width={responsive.isMobile ? "100%" : "100%"}
             />
           </View>
 
@@ -141,8 +153,8 @@ const SidebarItem = ({ label, active, onPress }) => (
   </TouchableOpacity>
 );
 
-const MetricCard = ({ title, value }) => (
-  <View style={styles.metricCard}>
+const MetricCard = ({ title, value, width }) => (
+  <View style={[styles.metricCard, { width: width || "100%" }]}>
     <Text style={styles.metricTitle}>{title}</Text>
     <Text style={styles.metricValue}>{value}</Text>
   </View>

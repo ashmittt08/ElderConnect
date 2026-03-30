@@ -147,13 +147,23 @@ export default function AdminDashboard({ navigation }) {
           </Text>
 
           {/* Stat Cards Row */}
-          <View style={[styles.statsRow, { flexDirection: responsive.isMobile ? "column" : "row", flexWrap: responsive.isTablet ? "wrap" : "nowrap" }]}>
+          <View style={[
+            styles.statsRow, 
+            { 
+              flexDirection: "row", 
+              flexWrap: "wrap", 
+              justifyContent: "center",
+              gap: 16,
+              marginBottom: 32 
+            }
+          ]}>
             <StatCard
               title="Total Users"
               value={stats?.totalUsers || 0}
               change="+10%"
               positive
               color={colors.primary}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
             <StatCard
               title="Active NGOs"
@@ -161,6 +171,7 @@ export default function AdminDashboard({ navigation }) {
               change="+5%"
               positive
               color={colors.success}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
             <StatCard
               title="Daily Activities"
@@ -168,6 +179,7 @@ export default function AdminDashboard({ navigation }) {
               change="+8%"
               positive
               color={colors.warning}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
             <StatCard
               title="Pending Verifications"
@@ -175,6 +187,7 @@ export default function AdminDashboard({ navigation }) {
               change={stats?.reportsPending > 0 ? "Needs attention" : "All clear"}
               positive={stats?.reportsPending === 0}
               color={colors.danger}
+              width={responsive.isMobile ? "100%" : "48%"}
             />
           </View>
 
@@ -428,8 +441,8 @@ const SectionHeader = ({ title, icon }) => (
   </View>
 );
 
-const StatCard = ({ title, value, change, positive, color }) => (
-  <View style={[styles.statCard, { borderTopColor: color, borderTopWidth: 3 }]}>
+const StatCard = ({ title, value, change, positive, color, width }) => (
+  <View style={[styles.statCard, { borderTopColor: color, borderTopWidth: 3, width: width || "100%" }]}>
     <Text style={styles.statTitle}>{title}</Text>
     <Text style={styles.statValue}>{typeof value === "number" ? value.toLocaleString() : value}</Text>
     <Text style={[styles.statChange, { color: positive ? colors.success : colors.danger }]}>

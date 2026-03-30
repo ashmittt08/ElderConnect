@@ -157,23 +157,35 @@ export default function VolunteerDashboard({ navigation }) {
           ) : (
             <>
               {/* Stats */}
-              <View style={[styles.statsRow, { flexDirection: responsive.isMobile ? "column" : "row" }]}>
+              <View style={[
+                styles.statsRow, 
+                { 
+                  flexDirection: "row", 
+                  flexWrap: "wrap", 
+                  justifyContent: "center",
+                  gap: 16,
+                  marginBottom: 30 
+                }
+              ]}>
                 <StatCard
                   title="Available Tasks"
                   value={available.length}
                   color={colors.primary}
                   onPress={() => navigation.navigate("AvailableRequests")}
+                  width={responsive.isMobile ? "100%" : "48%"}
                 />
                 <StatCard
                   title="Completed Tasks"
                   value={completed.length}
                   color={colors.green}
                   onPress={() => navigation.navigate("MyTasks")}
+                  width={responsive.isMobile ? "100%" : "48%"}
                 />
                 <StatCard
                   title="Pending Deliveries"
                   value={deliveries.length}
                   color="#F59E0B"
+                  width={responsive.isMobile ? "100%" : "100%"}
                 />
               </View>
 
@@ -334,9 +346,9 @@ const SidebarItem = ({ label, active, onPress }) => (
   </TouchableOpacity>
 );
 
-const StatCard = ({ title, value, color, onPress }) => (
+const StatCard = ({ title, value, color, onPress, width }) => (
   <TouchableOpacity
-    style={[styles.statCard, { borderColor: color }]}
+    style={[styles.statCard, { borderColor: color, width: width || "100%" }]}
     onPress={onPress}
     activeOpacity={0.7}
   >

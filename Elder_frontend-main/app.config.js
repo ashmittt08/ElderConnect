@@ -22,5 +22,9 @@ module.exports = ({ config }) => {
     plugins: [
       ...config.plugins || [],
     ],
+    extra: {
+      ...config.extra,
+      mapsApiKey: process.env.MAPS_API_KEY || "",
+    },
   };
 };

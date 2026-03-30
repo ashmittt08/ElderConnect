@@ -139,9 +139,17 @@ export default function ElderDashboard({ navigation }) {
 
           {/* Quick Actions */}
           <SectionHeader title="Quick Actions" icon="⚡" />
-          <View style={[styles.actionsRow, { flexDirection: responsive.isMobile ? "column" : "row", flexWrap: "wrap" }]}>
+          <View style={[
+            styles.actionsRow, 
+            { 
+              flexDirection: "row", 
+              flexWrap: "wrap", 
+              justifyContent: "center",
+              gap: 12 
+            }
+          ]}>
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: responsive.isMobile ? "100%" : "48%", minWidth: 150 }]}
               onPress={() => navigation.navigate("CreateRequest", { type: "medicine" })}
             >
               <Text style={styles.actionIcon}>💊</Text>
@@ -150,7 +158,7 @@ export default function ElderDashboard({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: responsive.isMobile ? "100%" : "48%", minWidth: 150 }]}
               onPress={() => navigation.navigate("DeliveryOrderScreen")}
             >
               <Text style={styles.actionIcon}>🚚</Text>
@@ -159,7 +167,7 @@ export default function ElderDashboard({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: responsive.isMobile ? "100%" : "48%", minWidth: 150 }]}
               onPress={() => navigation.navigate("CompanionScreen")}
             >
               <Text style={styles.actionIcon}>🤖</Text>
@@ -168,7 +176,7 @@ export default function ElderDashboard({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: responsive.isMobile ? "100%" : "48%", minWidth: 150 }]}
               onPress={() => navigation.navigate("DeliveryHistoryScreen")}
             >
               <Text style={styles.actionIcon}>📍</Text>
@@ -177,7 +185,7 @@ export default function ElderDashboard({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: responsive.isMobile ? "100%" : "100%", minWidth: 150 }]}
               onPress={() => navigation.navigate("MyRequests")}
             >
               <Text style={styles.actionIcon}>📋</Text>
