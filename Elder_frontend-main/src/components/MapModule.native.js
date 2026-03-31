@@ -44,6 +44,7 @@ export const MapView = ({
   style, 
   children, 
   initialRegion,
+  onRouteUpdate,
   ...props 
 }) => {
   const mapRef = useRef(null);
@@ -55,7 +56,7 @@ export const MapView = ({
   // Fetch route using FREE OSRM Public API (No Google Billing Required)
   useEffect(() => {
     const getFreeRoute = async () => {
-      if (!volunteer || !destination) return;
+      if (!volunteer?.latitude || !destination?.latitude) return;
 
       try {
         console.log("[MAP_DEBUG] Fetching route via FREE OSRM service...");
@@ -66,11 +67,21 @@ export const MapView = ({
           { timeout: 5000 }
         );
 
-        if (response.data?.routes?.[0]?.geometry) {
-          const encodedPath = response.data.routes[0].geometry;
+        if (response.data?.routes?.[0]) {
+          const route = response.data.routes[0];
+          const encodedPath = route.geometry;
           const decodedPoints = decodePolyline(encodedPath);
-          console.log(`[MAP_DEBUG] OSRM Route ready: ${decodedPoints.length} points, Dist: ${response.data.routes[0].distance}m`);
+          
+          console.log(`[MAP_DEBUG] OSRM Route ready: ${decodedPoints.length} points, Dist: ${route.distance}m, Duration: ${route.duration}s`);
+          
           setRoutePoints(decodedPoints);
+          
+          if (onRouteUpdate) {
+            onRouteUpdate({
+              distance: route.distance, // meters
+              duration: route.duration, // seconds
+            });
+          }
         } else {
           console.warn("[MAP_DEBUG] No route found in OSRM response");
           setRoutePoints([]);
@@ -111,23 +122,28 @@ export const MapView = ({
   return (
     <MapViewDefault
       ref={mapRef}
-      provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+      provider={PROVIDER_GOOGLE}
       style={style || { flex: 1 }}
-      initialRegion={initialRegion || (volunteer ? {
+      initialRegion={initialRegion || (volunteer?.latitude && volunteer?.longitude ? {
         latitude: volunteer.latitude,
         longitude: volunteer.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
-      } : (destination ? {
+      } : (destination?.latitude && destination?.longitude ? {
         latitude: destination.latitude,
         longitude: destination.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
-      } : undefined))}
+      } : {
+        latitude: 23.2599,
+        longitude: 77.4126,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
+      }))}
       {...props}
     >
       {/* Volunteer Marker */}
-      {volunteer && (
+      {volunteer?.latitude && volunteer?.longitude && (
         <Marker
           coordinate={{ latitude: volunteer.latitude, longitude: volunteer.longitude }}
           title="Volunteer Partner"
@@ -136,7 +152,7 @@ export const MapView = ({
       )}
 
       {/* Destination Marker */}
-      {destination && (
+      {destination?.latitude && destination?.longitude && (
         <Marker
           coordinate={{ latitude: destination.latitude, longitude: destination.longitude }}
           title="Delivery Destination"

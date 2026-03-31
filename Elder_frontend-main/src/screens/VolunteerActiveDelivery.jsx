@@ -56,6 +56,7 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   
   const [destination, setDestination] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null); // { distance, duration }
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const locationWatcher = useRef(null);
@@ -193,8 +194,15 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
     const proceed = async () => {
       try {
         setUpdating(true);
-        const eta = new Date();
-        eta.setMinutes(eta.getMinutes() + 30); // simplistic ETA
+        
+        let eta = new Date();
+        if (routeInfo?.duration) {
+          // Add route duration (seconds) plus 2 mins buffer for safety
+          eta.setSeconds(eta.getSeconds() + routeInfo.duration + 120);
+        } else {
+          // Fallback if routing fails
+          eta.setMinutes(eta.getMinutes() + 20);
+        }
 
         await api.put(`/delivery/status/${orderId}`, {
           status: newStatus,
@@ -282,6 +290,7 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
             style={styles.map}
             volunteer={currentLocation}
             destination={destination}
+            onRouteUpdate={setRouteInfo}
             initialRegion={{
               ...(currentLocation || destination || { latitude: 23.2599, longitude: 77.4126 }),
               latitudeDelta: 0.05,
@@ -299,11 +308,19 @@ export default function VolunteerActiveDelivery({ route, navigation }) {
           <Text style={styles.topBackBtnIcon}>←</Text>
         </TouchableOpacity>
 
-        {/* Live Broadcast Indicator */}
+        {/* Live Broadcast Indicator & ETA */}
         {isActive && currentLocation && (
           <View style={styles.liveBadgeOverlay}>
             <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
             <Text style={styles.liveTextLabel}>BROADCASTING LOCATION</Text>
+            {routeInfo && (
+              <>
+                <View style={styles.badgeDivider} />
+                <Text style={styles.etaText}>
+                  {Math.round(routeInfo.duration / 60)} MINS ({(routeInfo.distance / 1000).toFixed(1)} KM)
+                </Text>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -536,6 +553,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,
+  },
+  badgeDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  etaText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
   },
 
   // Bottom Sheet

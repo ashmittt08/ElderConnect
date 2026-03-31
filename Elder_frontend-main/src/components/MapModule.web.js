@@ -49,7 +49,14 @@ const mapHtml = `
         const data = await response.json();
         
         if (data.routes && data.routes.length > 0) {
-          return data.routes[0].geometry;
+          const route = data.routes[0];
+          // Send route info (duration + distance) back to parent
+          window.parent.postMessage({
+            type: 'ROUTE_INFO',
+            distance: route.distance,
+            duration: route.duration,
+          }, '*');
+          return route.geometry;
         }
       } catch (err) {
         console.error("OSRM Fetch Error:", err);
@@ -122,7 +129,7 @@ const mapHtml = `
 </html>
 `;
 
-export const MapView = ({ volunteer, destination, style }) => {
+export const MapView = ({ volunteer, destination, style, onRouteUpdate }) => {
   const iframeRef = useRef(null);
   
   const updateMap = () => {
@@ -140,10 +147,16 @@ export const MapView = ({ volunteer, destination, style }) => {
       if (e.data?.type === 'MAP_READY') {
         updateMap();
       }
+      if (e.data?.type === 'ROUTE_INFO' && onRouteUpdate) {
+        onRouteUpdate({
+          distance: e.data.distance,
+          duration: e.data.duration,
+        });
+      }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [volunteer, destination]);
+  }, [volunteer, destination, onRouteUpdate]);
 
   return (
     <iframe

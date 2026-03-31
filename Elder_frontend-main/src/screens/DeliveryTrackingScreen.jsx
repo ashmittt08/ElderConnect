@@ -58,6 +58,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [volunteerLocation, setVolunteerLocation] = useState(null);
   const [destination, setDestination] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null); // { distance, duration }
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -166,9 +167,16 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
       : STATUS_STEPS.findIndex((s) => s.key === order.status);
   const isActive = !["delivered", "cancelled"].includes(order.status);
 
-  // Time formatting
+  // Time formatting - prioritize live routing data
   const getETA = () => {
     if (order.status === "delivered") return "Delivered";
+
+    // Prioritize Live routing data from OSRM
+    if (routeInfo?.duration) {
+      const mins = Math.round(routeInfo.duration / 60);
+      return `Arriving in ${mins} min`;
+    }
+
     if (!order.estimatedArrival) return "Calculating ETA...";
     
     const etaMs = new Date(order.estimatedArrival).getTime();
@@ -191,6 +199,7 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
                 style={styles.map}
                 volunteer={volunteerLocation}
                 destination={destination}
+                onRouteUpdate={setRouteInfo}
                 initialRegion={{
                   ...(volunteerLocation || destination || { latitude: 23.2599, longitude: 77.4126 }),
                   latitudeDelta: 0.05,
@@ -203,11 +212,19 @@ export default function DeliveryTrackingScreen({ route, navigation }) {
               </View>
             )}
 
-            {/* Live Indicator Overlay */}
+            {/* Live Indicator Overlay & ETA */}
             {isActive && (
               <View style={styles.liveBadgeOverlay}>
                 <Animated.View style={[styles.liveDot, { transform: [{ scale: pulseAnim }] }]} />
                 <Text style={styles.liveTextLabel}>TRACKING LIVE</Text>
+                {routeInfo && (
+                  <>
+                    <View style={styles.badgeDivider} />
+                    <Text style={styles.etaBadgeText}>
+                      {Math.round(routeInfo.duration / 60)} MINS ({(routeInfo.distance / 1000).toFixed(1)} KM)
+                    </Text>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -414,9 +431,19 @@ const styles = StyleSheet.create({
   },
   liveTextLabel: {
     color: "#FFF",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
     letterSpacing: 1,
+  },
+  badgeDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  etaBadgeText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
   },
 
   // Bottom Sheet Overlays

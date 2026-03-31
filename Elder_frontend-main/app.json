@@ -14,10 +14,18 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyAFiq9_eEFGhLEnk8MQuz5ftYRK5pLLRZQ"
+      }
     },
     "android": {
-      "package": "com.rishi2004shorganization.elderconnect"
+      "package": "com.rishi2004shorganization.elderconnect",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAFiq9_eEFGhLEnk8MQuz5ftYRK5pLLRZQ"
+        }
+      }
     },
     "web": {
       "output": "single"
@@ -29,7 +37,8 @@
     "extra": {
       "eas": {
         "projectId": "87289c12-bab0-43cf-81f9-cb4452e2047c"
-      }
+      },
+      "mapsApiKey": "AIzaSyAFiq9_eEFGhLEnk8MQuz5ftYRK5pLLRZQ"
     },
     "owner": "rishi2004sh-organization"
   }
